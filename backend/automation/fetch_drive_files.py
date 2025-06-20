@@ -3,11 +3,11 @@ from pydrive2.drive import GoogleDrive
 import os
 
 def fetch_drive_files_from_google():
-    # Use service account credentials (JSON file must be in same directory or secure path)
+    # Use service account credentials (path set by env variable in Render)
     gauth = GoogleAuth()
     gauth.settings['client_config_backend'] = 'service'
     gauth.settings['service_config'] = {
-        "client_json_file_path": "cookie-drive-bot.json",
+        "client_json_file_path": os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
         "client_user_email": "cookie-drive-bot@cookie-sales-463514.iam.gserviceaccount.com",
         "client_id": "",
         "client_secret": ""
@@ -19,7 +19,7 @@ def fetch_drive_files_from_google():
 
     # Google Drive Folder IDs
     RAW_PARENT_FOLDER_ID = "1W9y9J8AfRYyhDwgRFYWVm4Gkp4jBQldz"        # Raw files folder
-    HISTORICAL_FOLDER_ID = "1prylqI0RIr97bBGu--w9KQ1PefbTj7Xc"               # Replace this with actual ID
+    HISTORICAL_FOLDER_ID = "1prylqI0RIr97bBGu--w9KQ1PefbTj7Xc"         # Final historical data folder
 
     os.makedirs("data", exist_ok=True)
 
@@ -76,4 +76,5 @@ def fetch_drive_files_from_google():
 
         if not found:
             print(f"⚠️ {historical_filename} not found in GS_Cookie_Sales_Final folder.")
+
     print("🚀 Fetching files from Google Drive completed successfully!\n")
