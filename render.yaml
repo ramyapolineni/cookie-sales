@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: cookie-forecast-api
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    plan: free
+    envVars:
+      - key: GOOGLE_APPLICATION_CREDENTIALS
+        value: backend/automation/cookie-drive-bot.json
+      - key: DATABASE_URL
+        value: <postgresql://cookies_sales_db_user:8AdRDKhNVRYsNojdvFUiAg61rexSMPKr@dpg-d1arinnfte5s73dpbn2g-a.oregon-postgres.render.com/cookies_sales_db>
+
+jobs:
+  - type: cron
+    name: run-cookie-sales-pipeline
+    env: python
+    schedule: "0 4 * * 1"  # every Monday at 4 AM UTC
+    buildCommand: pip install -r requirements.txt
+    startCommand: python backend/automation/run_pipeline.py
+    envVars:
+      - key: GOOGLE_APPLICATION_CREDENTIALS
+        value: backend/automation/cookie-drive-bot.json
+      - key: DATABASE_URL
+        value: <postgresql://cookies_sales_db_user:8AdRDKhNVRYsNojdvFUiAg61rexSMPKr@dpg-d1arinnfte5s73dpbn2g-a.oregon-postgres.render.com/cookies_sales_db>
