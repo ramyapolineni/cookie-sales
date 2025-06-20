@@ -1,0 +1,7 @@
+cookie-drive-bot.json
+
+
+# Ignore local data outputs
+data/
+*.csv
+cookie-drive-bot.json
