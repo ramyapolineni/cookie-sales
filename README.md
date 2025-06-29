@@ -21,8 +21,6 @@ ML-powered platform for predicting Girl Scout cookie sales using historical data
 - Real-time prediction interface
 
 ## Data Pipeline
-
-Weekly automated process (Mondays 4 AM UTC):
 1. Fetch raw sales/participation data from Google Drive
 2. Clean and standardize data
 3. Apply cookie type mapping and normalization
