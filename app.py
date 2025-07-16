@@ -11,6 +11,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from tqdm import tqdm
 from sklearn.linear_model import BayesianRidge
+from scipy.stats import linregress
 
 warnings.simplefilter("ignore", category=RuntimeWarning)
 
@@ -24,6 +25,13 @@ CORS(app, resources={r"/api/*": {"origins": ["http://localhost:3000", "https://g
 # DATA LOADING & PREPROCESSING
 # -------------------------------
 df = pd.read_csv('FinalCookieSales_2020_2024.csv')
+
+# Rename columns to match expected format
+df = df.rename(columns={
+    'SU_Name': 'SU Name',
+    'SU_Num': 'SU #'
+})
+
 df = df.drop(columns=['date'], errors='ignore')
 df = df.dropna()
 df = df[df['number_cases_sold'] > 0]
@@ -85,7 +93,13 @@ def run_ridge_interval_analysis():
         y_train_all.extend(y_train)
         y_pred_all.extend(y_pred)
 
-    rmse = np.sqrt(mean_squared_error(y_train_all, y_pred_all))
+    # Check if we have any data before calculating RMSE
+    if len(y_train_all) == 0:
+        print("Warning: No valid training data found for RMSE calculation. Using default RMSE of 10.0")
+        rmse = 10.0
+    else:
+        rmse = np.sqrt(mean_squared_error(y_train_all, y_pred_all))
+    
     app.config['OVERALL_RIDGE_RMSE'] = rmse
     print(f"Global RMSE for prediction interval: {rmse:.2f}")
 
