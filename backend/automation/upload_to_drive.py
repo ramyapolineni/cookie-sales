@@ -18,7 +18,7 @@ gauth.ServiceAuth()
 drive = GoogleDrive(gauth)
 
 # === Define paths and names ===
-upload_folder_id = 'YOUR_UPLOAD_FOLDER_ID'  # 🔁 Replace this
+upload_folder_id = '1oYZceOPsUXtVff7nm6Iev2VOuUyvxQvD'  # 🔁 Replace this
 base_file = 'data/FinalCookieSales_all_years.csv'
 
 # Create versioned filename
