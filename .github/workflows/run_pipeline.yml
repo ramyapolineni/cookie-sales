@@ -1,4 +1,4 @@
-name: Run Cookie Sales Pipeline
+name: Cookie Sales Input Files
 
 on:
   workflow_dispatch:  # Manual trigger from GitHub UI
