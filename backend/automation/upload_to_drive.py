@@ -1,7 +1,11 @@
 import os
+import shutil
+import zipfile
+from datetime import datetime
 from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
 
+# === Authenticate using service account ===
 gauth = GoogleAuth()
 gauth.settings['client_config_backend'] = 'service'
 gauth.settings['service_config'] = {
@@ -13,14 +17,30 @@ gauth.settings['service_config'] = {
 gauth.ServiceAuth()
 drive = GoogleDrive(gauth)
 
-upload_folder_id = '1oYZceOPsUXtVff7nm6Iev2VOuUyvxQvD'  # 🔁 Replace this
-output_file = 'data/FinalCookieSales_all_years.csv'
+# === Define paths and names ===
+upload_folder_id = 'YOUR_UPLOAD_FOLDER_ID'  # 🔁 Replace this
+base_file = 'data/FinalCookieSales_all_years.csv'
 
-if os.path.exists(output_file):
-    file_name = os.path.basename(output_file)
-    gfile = drive.CreateFile({'title': file_name, 'parents': [{'id': upload_folder_id}]})
-    gfile.SetContentFile(output_file)
+# Create versioned filename
+today_str = datetime.today().strftime('%Y-%m-%d')
+versioned_name = f'FinalCookieSales_all_years_{today_str}.csv'
+versioned_path = f'data/{versioned_name}'
+zip_path = f'{versioned_path}.zip'
+
+# === Copy base file to versioned file ===
+if os.path.exists(base_file):
+    shutil.copy(base_file, versioned_path)
+    print(f"📝 Created versioned copy: {versioned_path}")
+
+    # === Zip the versioned file ===
+    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        zipf.write(versioned_path, arcname=versioned_name)
+    print(f"📦 Compressed version: {zip_path}")
+
+    # === Upload the .zip file to Google Drive ===
+    gfile = drive.CreateFile({'title': os.path.basename(zip_path), 'parents': [{'id': upload_folder_id}]})
+    gfile.SetContentFile(zip_path)
     gfile.Upload()
-    print(f'✅ Uploaded {file_name} to Google Drive folder {upload_folder_id}')
+    print(f'✅ Uploaded {os.path.basename(zip_path)} to Google Drive folder {upload_folder_id}')
 else:
-    print(f'⚠️ Output file not found: {output_file}')
+    print(f'⚠️ Output file not found: {base_file}')
