@@ -1,7 +1,7 @@
-name: Run Cookie Sales
+name: Run Cookie Sales Pipeline
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # Manual trigger from GitHub UI
 
 jobs:
   run-pipeline:
@@ -14,19 +14,22 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: '3.10'  # Compatible with all your dependencies
 
       - name: Install Python dependencies
         run: |
           pip install -r requirements.txt
           pip install PyDrive2
- 
-      - name: Upload versioned ZIP file to Google Drive
-        run: |
-          echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > service_account.json
-          python backend/automation/upload_to_drive.py
+
+      - name: Create service account key file
+        run: echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > service_account.json
         env:
           GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
 
-     - name: Run cookie sales pipeline
+      - name: Run cookie sales pipeline
         run: python backend/automation/run_pipeline.py
+
+      - name: Upload versioned ZIP file to Google Drive
+        run: python backend/automation/upload_to_drive.py
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
