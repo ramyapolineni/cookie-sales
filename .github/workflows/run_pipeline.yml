@@ -20,13 +20,13 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install PyDrive2
-
-      - name: Run cookie sales pipeline
-        run: python backend/automation/run_pipeline.py
-
+ 
       - name: Upload versioned ZIP file to Google Drive
         run: |
           echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > service_account.json
           python backend/automation/upload_to_drive.py
         env:
           GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+
+     - name: Run cookie sales pipeline
+        run: python backend/automation/run_pipeline.py
