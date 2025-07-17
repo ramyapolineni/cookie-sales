@@ -2,7 +2,6 @@ import pandas as pd
 import os
 import re
 from glob import glob
-from apply_cookie_mapping import mapping_df
 
 
 # === LOAD + CLEAN PARTICIPATION FILE ===
@@ -53,50 +52,6 @@ def load_and_clean_sales(file_path, year):
 def merge_with_participation(melted_df, part_df):
     merged = pd.merge(melted_df, part_df, how='left', on='troop_id')
     return merged
-
-
-# === APPLY COOKIE MAPPING ===
-def apply_cookie_mapping(df, mapping_df, year):
-    for _, row in mapping_df.iterrows():
-        if row.get('start_year', year) != year:
-            continue
-
-        old_cookie = row['old_cookie']
-        original = df[df['cookie_type'] == old_cookie]
-
-        if original.empty:
-            continue
-
-        used_multi_mapping = False
-
-        for i in range(1, 4):
-            new_cookie_col = f'new_cookie_{i}'
-            percent_col = f'percent_{i}'
-
-            if pd.notna(row.get(new_cookie_col)) and not pd.isna(row.get(percent_col)):
-                new_cookie = row[new_cookie_col]
-                percent = row[percent_col]
-
-                if percent > 0:
-                    split = original.copy()
-                    split['cookie_type'] = new_cookie
-                    split['number_cases_sold'] *= percent / 100
-                    df = pd.concat([df, split], ignore_index=True)
-                    print(f"🔁 {old_cookie} → {new_cookie} ({percent}%)")
-                    used_multi_mapping = True
-
-        if not used_multi_mapping and pd.notna(row.get('new_cookie')):
-            percent = row.get('transfer_percent', 100)
-            transferred = original.copy()
-            transferred['cookie_type'] = row['new_cookie']
-            transferred['number_cases_sold'] *= percent / 100
-            df = pd.concat([df, transferred], ignore_index=True)
-            print(f"🔁 {old_cookie} → {row['new_cookie']} ({percent}%) [Legacy format]")
-
-        df = df[df['cookie_type'] != old_cookie]
-
-    return df
-
 
 # === SAVE FINAL FILE ===
 def save_final(df, year):
