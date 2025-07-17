@@ -106,7 +106,6 @@ if __name__ == "__main__":
                 sales_df = load_and_clean_sales(sales_path, year)
                 part_df = load_and_clean_participation(part_path)
                 merged_df = merge_with_participation(sales_df, part_df)
-                final_df = apply_cookie_mapping(merged_df, mapping_df, year)
                 save_final(final_df, year)
 
             except Exception as e:
