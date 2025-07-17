@@ -3,11 +3,11 @@ from pydrive2.drive import GoogleDrive
 import os
 
 def fetch_drive_files_from_google():
-    # Use service account credentials (path set by env variable in Render)
+    # Use service account credentials from file created in GitHub Actions
     gauth = GoogleAuth()
     gauth.settings['client_config_backend'] = 'service'
     gauth.settings['service_config'] = {
-        "client_json_file_path": os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
+        "client_json_file_path": "service_account.json",
         "client_user_email": "cookie-drive-bot@cookie-sales-463514.iam.gserviceaccount.com",
         "client_id": "",
         "client_secret": ""
