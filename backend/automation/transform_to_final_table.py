@@ -50,7 +50,12 @@ def load_and_clean_sales(file_path, year):
 
 # === MERGE SALES + PARTICIPATION FILES ===
 def merge_with_participation(melted_df, part_df):
+    # Drop SU_Name and SU_Num from sales file before merge to avoid duplication
+    melted_df = melted_df.drop(columns=['SU_Name', 'SU_Num'], errors='ignore')
+
+    # Merge on troop_id only; keep SU_Name and SU_Num from participation file
     merged = pd.merge(melted_df, part_df, how='left', on='troop_id')
+
     return merged
 
 # === SAVE FINAL FILE ===
