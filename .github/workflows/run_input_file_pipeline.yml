@@ -1,0 +1,60 @@
+name: Run Cookie Sales Pipeline
+
+on:
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install PyDrive2
+
+      - name: Run cookie sales pipeline
+        run: python backend/automation/run_pipeline.py
+
+      - name: Upload output file to Google Drive
+        run: |
+          echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > service_account.json
+
+          python <<EOF
+import os
+from pydrive2.auth import GoogleAuth
+from pydrive2.drive import GoogleDrive
+
+gauth = GoogleAuth()
+gauth.settings['client_config_backend'] = 'service'
+gauth.settings['service_config'] = {
+    'client_json_file_path': 'service_account.json',
+    'client_user_email': 'cookie-drive-bot@cookie-sales-463514.iam.gserviceaccount.com',
+    'client_id': '',
+    'client_secret': ''
+}
+gauth.ServiceAuth()
+drive = GoogleDrive(gauth)
+
+upload_folder_id = '1oYZceOPsUXtVff7nm6Iev2VOuUyvxQvD'  # 🔁 Replace with your actual folder ID
+output_file = 'data/FinalCookieSales_all_years.csv'
+
+if os.path.exists(output_file):
+    file_name = os.path.basename(output_file)
+    gfile = drive.CreateFile({'title': file_name, 'parents': [{'id': upload_folder_id}]})
+    gfile.SetContentFile(output_file)
+    gfile.Upload()
+    print(f'✅ Uploaded {file_name} to Google Drive folder {upload_folder_id}')
+else:
+    print(f'⚠️ Output file not found: {output_file}')
+EOF
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
