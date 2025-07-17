@@ -4,12 +4,10 @@ import re
 from glob import glob
 
 from fetch_drive_files import fetch_drive_files_from_google
-from apply_cookie_mapping import mapping_df
 from transform_to_final_table import (
     load_and_clean_sales,
     load_and_clean_participation,
     merge_with_participation,
-    apply_cookie_mapping,
     save_final
 )
 
@@ -86,8 +84,7 @@ if __name__ == "__main__":
                 sales_df = load_and_clean_sales(sales_path, year)
                 part_df = load_and_clean_participation(part_path)
                 merged_df = merge_with_participation(sales_df, part_df)
-                final_df = apply_cookie_mapping(merged_df, mapping_df, year)
-                save_final(final_df, year)
+                save_final(merged_df, year)
             except Exception as e:
                 print(f"⚠️ Failed to process {year}: {e}")
 
@@ -95,6 +92,3 @@ if __name__ == "__main__":
     combine_all_years()
 
     print("\n🎉 Pipeline complete!")
-# This script processes cookie sales data, merging new years with historical data and applying necessary transformations.
-# It fetches files from Google Drive, cleans and merges sales and participation data, applies cookie mapping,
-# and saves the final output. It also combines all years into a single file for easy access.
