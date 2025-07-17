@@ -11,4 +11,6 @@ python-dotenv==0.21.0
 kneed==0.7.0
 openpyxl==3.1.2
 PyDrive2==1.21.3
+SQLAlchemy==1.4.49
+psycopg2-binary==2.9.9
 
