@@ -1,4 +1,4 @@
-name: Run Cookie Sales Pipeline
+name: Run Cookie Sales
 
 on:
   workflow_dispatch:
