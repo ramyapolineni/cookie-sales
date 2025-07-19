@@ -1,4 +1,4 @@
-name: Cookie Sales Input Files
+name: Cookie Sales Render Upload with cookie Mapping
 
 on:
   workflow_dispatch:  # Manual trigger from GitHub UI
@@ -7,6 +7,10 @@ jobs:
   run-pipeline:
     runs-on: ubuntu-latest
 
+    env:
+      GOOGLE_APPLICATION_CREDENTIALS: service_account.json
+      RENDER_DATABASE_URL: ${{ secrets.RENDER_DATABASE_URL }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -14,22 +18,20 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'  # Compatible with all your dependencies
+          python-version: '3.10'
 
       - name: Install Python dependencies
         run: |
           pip install -r requirements.txt
-          pip install PyDrive2
+          pip install PyDrive2 gspread oauth2client
 
       - name: Create service account key file
         run: echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > service_account.json
         env:
           GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
 
-      - name: Run cookie sales pipeline
+      - name: Run cookie sales pipeline and upload to Render DB
         run: python backend/automation/run_pipeline.py
 
-      - name: Upload versioned ZIP file to Google Drive
-        run: python backend/automation/upload_to_drive.py
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+      - name: Upload cookie mapping tables to Render DB
+        run: python backend/automation/upload_cookie_mapping_to_db.py
