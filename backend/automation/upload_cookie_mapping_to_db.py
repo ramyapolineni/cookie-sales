@@ -45,8 +45,9 @@ def fetch_and_upload_cookie_mapping():
 
     # Step 3: Read sheets
     print("📥 Reading sheets...")
-    transitions_df = pd.read_excel(excel_path, sheet_name="cookie_transitions")
-    active_df = pd.read_excel(excel_path, sheet_name="active_cookies")
+    transitions_df = pd.read_excel(excel_path, sheet_name="cookie_transitions", engine="openpyxl")
+    active_df = pd.read_excel(excel_path, sheet_name="active_cookies", engine="openpyxl")
+
 
     # Optional: Clean column names
     transitions_df.columns = [col.strip().replace('\n', ' ') for col in transitions_df.columns]
