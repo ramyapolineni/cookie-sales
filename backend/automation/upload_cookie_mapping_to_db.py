@@ -1,12 +1,11 @@
 import pandas as pd
 import os
-import requests
 from sqlalchemy import create_engine
 from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
 
 def fetch_and_upload_cookie_mapping():
-    # Authenticate with service account
+    # === Step 1: Authenticate using service account ===
     gauth = GoogleAuth()
     gauth.settings['client_config_backend'] = 'service'
     gauth.settings['service_config'] = {
@@ -18,7 +17,7 @@ def fetch_and_upload_cookie_mapping():
     gauth.ServiceAuth()
     drive = GoogleDrive(gauth)
 
-    # Google Drive Folder + target file name
+    # === Step 2: Locate file in Google Drive ===
     FOLDER_ID = "1e_3Y1LEuvqCicUG64G4QOkX1yHMEOvem"
     TARGET_FILENAME = "cookie_mapping"
 
@@ -37,19 +36,17 @@ def fetch_and_upload_cookie_mapping():
     if not file_id:
         raise FileNotFoundError("❌ cookie_mapping file not found in Google Drive folder")
 
-    # Step 2: Export file using Google Sheets export endpoint
-    export_url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=xlsx"
-    excel_path = "data/cookie_mapping.xlsx"
-    os.makedirs("data", exist_ok=True)
-
+    # === Step 3: Export and download as Excel (.xlsx) ===
     print("⬇️ Downloading as Excel...")
-    response = requests.get(export_url)
-    if response.status_code != 200:
-        raise Exception(f"Failed to download Excel export. Status: {response.status_code}")
-    with open(excel_path, "wb") as f:
-        f.write(response.content)
+    os.makedirs("data", exist_ok=True)
+    excel_path = "data/cookie_mapping.xlsx"
+    download_file = drive.CreateFile({'id': file_id})
+    download_file.GetContentFile(
+        excel_path,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
 
-    # Step 3: Read sheets
+    # === Step 4: Read both sheets ===
     print("📥 Reading sheets...")
     transitions_df = pd.read_excel(excel_path, sheet_name="cookie_transitions", engine="openpyxl")
     active_df = pd.read_excel(excel_path, sheet_name="active_cookies", engine="openpyxl")
@@ -58,12 +55,13 @@ def fetch_and_upload_cookie_mapping():
     transitions_df.columns = [col.strip().replace('\n', ' ') for col in transitions_df.columns]
     active_df.columns = [col.strip().replace('\n', ' ') for col in active_df.columns]
 
-    # Step 4: Upload to database
+    # === Step 5: Upload to PostgreSQL ===
     db_url = os.getenv("RENDER_DATABASE_URL")
     if not db_url:
         raise ValueError("RENDER_DATABASE_URL not set in environment variables")
 
     engine = create_engine(db_url)
+
     transitions_df.to_sql("cookie_transitions", con=engine, if_exists="replace", index=False)
     active_df.to_sql("active_cookies", con=engine, if_exists="replace", index=False)
 
