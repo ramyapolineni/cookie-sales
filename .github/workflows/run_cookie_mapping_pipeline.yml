@@ -1,7 +1,7 @@
 name: Upload Cookie Mapping to Render DB
 
 on:
-  workflow_dispatch:  # Trigger manually from GitHub UI
+  workflow_dispatch:  # Manual trigger from GitHub Actions UI
 
 jobs:
   upload-cookie-mapping:
@@ -20,14 +20,15 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: |
           pip install -r requirements.txt
+          pip install PyDrive2 openpyxl
 
       - name: Create service account key file
         run: echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > service_account.json
         env:
           GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
 
-      - name: Upload cookie mapping to Render DB
+      - name: Run cookie mapping upload script
         run: python backend/automation/upload_cookie_mapping_to_db.py
