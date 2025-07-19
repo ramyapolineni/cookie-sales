@@ -4,14 +4,13 @@ import re
 from glob import glob
 
 from fetch_drive_files import fetch_drive_files_from_google
-from apply_cookie_mapping import mapping_df
 from transform_to_final_table import (
     load_and_clean_sales,
     load_and_clean_participation,
     merge_with_participation,
-    apply_cookie_mapping,
     save_final
 )
+from upload_to_render_db import upload_to_render_db  # <-- new import
 
 # === STEP 1: Get list of years to process ===
 def get_unprocessed_years():
@@ -25,7 +24,7 @@ def get_unprocessed_years():
     # Only consider 2025 and beyond
     target_years = [y for y in available_years if y >= 2025]
 
-    # Skip years already processed
+    # Skip already processed years
     processed_files = glob("data/FinalCookieSales_*.csv")
     processed_years = {
         int(re.search(r"(\d{4})", f).group(1))
@@ -48,7 +47,7 @@ def combine_all_years():
 
     if not new_years_dfs:
         print("ℹ️ No new year files found to merge with historical data.")
-        return
+        return None
 
     all_new = pd.concat(new_years_dfs, ignore_index=True)
 
@@ -62,6 +61,7 @@ def combine_all_years():
     output_path = "data/FinalCookieSales_all_years.csv"
     combined.to_csv(output_path, index=False)
     print(f"✅ Combined all-year file saved to: {output_path}")
+    return combined
 
 # === MAIN RUNNER ===
 if __name__ == "__main__":
@@ -86,15 +86,20 @@ if __name__ == "__main__":
                 sales_df = load_and_clean_sales(sales_path, year)
                 part_df = load_and_clean_participation(part_path)
                 merged_df = merge_with_participation(sales_df, part_df)
-                final_df = apply_cookie_mapping(merged_df, mapping_df, year)
-                save_final(final_df, year)
+                save_final(merged_df, year)
             except Exception as e:
                 print(f"⚠️ Failed to process {year}: {e}")
 
     # Step 3: Merge with historical (2020–2024)
-    combine_all_years()
+    combined_df = combine_all_years()
+
+    # Step 4: Upload to Render PostgreSQL
+    if combined_df is not None:
+        try:
+            upload_to_render_db(combined_df)
+        except Exception as e:
+            print(f"❌ Upload to database failed: {e}")
+    else:
+        print("⚠️ Skipping DB upload: No new data to combine.")
 
     print("\n🎉 Pipeline complete!")
-# This script processes cookie sales data, merging new years with historical data and applying necessary transformations.
-# It fetches files from Google Drive, cleans and merges sales and participation data, applies cookie mapping,
-# and saves the final output. It also combines all years into a single file for easy access.
