@@ -14,4 +14,5 @@ PyDrive2==1.21.3
 SQLAlchemy==1.4.49
 psycopg2-binary==2.9.9
 requests==2.31.0
-
+gspread==5.12.0
+gspread_dataframe==3.3.1
