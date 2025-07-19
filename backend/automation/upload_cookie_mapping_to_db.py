@@ -1,66 +1,36 @@
 import pandas as pd
 import os
 from sqlalchemy import create_engine
-from pydrive2.auth import GoogleAuth
-from pydrive2.drive import GoogleDrive
+from gspread import service_account
+import gspread_dataframe as gd
 
-MAX_SHARE_COOKIES = 5  # max number of share-from cookies to support
+MAX_SHARE_COOKIES = 5
 
 def fetch_and_upload_cookie_mapping():
-    # Authenticate using service account
-    gauth = GoogleAuth()
-    gauth.settings['client_config_backend'] = 'service'
-    gauth.settings['service_config'] = {
-        "client_json_file_path": "service_account.json",
-        "client_user_email": "cookie-drive-bot@cookie-sales-463514.iam.gserviceaccount.com",
-        "client_id": "",
-        "client_secret": ""
-    }
-    gauth.ServiceAuth()
-    drive = GoogleDrive(gauth)
+    # Load service account credentials
+    gc = service_account(filename="service_account.json")
 
-    # Google Drive folder and file
-    FOLDER_ID = "1e_3Y1LEuvqCicUG64G4QOkX1yHMEOvem"
-    TARGET_FILENAME = "cookie_mapping"
+    # Open spreadsheet
+    print("🔍 Opening 'cookie_mapping' Google Sheet...")
+    spreadsheet = gc.open("cookie_mapping")
 
-    # Step 1: Find the file
-    print("🔍 Searching for cookie_mapping Google Sheet...")
-    file_list = drive.ListFile({
-        'q': f"'{FOLDER_ID}' in parents and trashed=false and mimeType='application/vnd.google-apps.spreadsheet'"
-    }).GetList()
+    # Read sheets
+    print("📥 Reading tabs from Google Sheet...")
+    transitions_ws = spreadsheet.worksheet("cookie_transitions")
+    active_ws = spreadsheet.worksheet("active_cookies")
 
-    file_id = None
-    for file in file_list:
-        if file['title'].lower() == TARGET_FILENAME.lower():
-            file_id = file['id']
-            print(f"✅ Found file: {file['title']}")
-            break
+    transitions_df = gd.get_as_dataframe(transitions_ws).dropna(how='all')
+    active_df = gd.get_as_dataframe(active_ws).dropna(how='all')
 
-    if not file_id:
-        raise FileNotFoundError("❌ cookie_mapping file not found in Google Drive folder")
-
-    # Step 2: Download as Excel
-    print("⬇️ Downloading as Excel...")
-    sheet_url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=xlsx"
-    excel_path = "data/cookie_mapping.xlsx"
-    os.makedirs("data", exist_ok=True)
-    response_code = os.system(f"curl -L '{sheet_url}' --output {excel_path}")
-    if response_code != 0:
-        raise Exception("Failed to download the Excel file. Check permissions or URL.")
-
-    # Step 3: Read sheets
-    print("📥 Reading sheets...")
-    transitions_df = pd.read_excel(excel_path, sheet_name="cookie_transitions", engine="openpyxl")
-    active_df = pd.read_excel(excel_path, sheet_name="active_cookies", engine="openpyxl")
-
-    # === Clean column names ===
-    transitions_df.columns = [col.strip().replace('\n', ' ') for col in transitions_df.columns]
-    active_df.columns = [col.strip().replace('\n', ' ') for col in active_df.columns]
+    # Clean headers
+    transitions_df.columns = [col.strip() for col in transitions_df.columns]
+    active_df.columns = [col.strip() for col in active_df.columns]
 
     # === Transform transitions_df ===
     def explode_share_columns(row):
         takes_from = str(row.get("Takes Share From (Other Cookies)", "")).split(",")
         share_pct = str(row.get("Share % Taken", "")).replace("%", "").split(",")
+
         takes_from = [t.strip() for t in takes_from if t.strip()]
         share_pct = [p.strip() for p in share_pct if p.strip()]
 
@@ -73,16 +43,16 @@ def fetch_and_upload_cookie_mapping():
     transitions_df = transitions_df.apply(explode_share_columns, axis=1)
     transitions_df.drop(columns=["Takes Share From (Other Cookies)", "Share % Taken"], inplace=True)
 
-    # Step 4: Upload to DB
+    # Upload to DB
     db_url = os.getenv("RENDER_DATABASE_URL")
     if not db_url:
-        raise ValueError("RENDER_DATABASE_URL not set in environment variables")
+        raise ValueError("RENDER_DATABASE_URL not set")
 
     engine = create_engine(db_url)
     transitions_df.to_sql("cookie_transitions", con=engine, if_exists="replace", index=False)
     active_df.to_sql("active_cookies", con=engine, if_exists="replace", index=False)
 
-    print("✅ cookie_transitions and active_cookies uploaded to Render DB")
+    print("✅ Uploaded to Render DB: cookie_transitions and active_cookies")
 
 if __name__ == "__main__":
     fetch_and_upload_cookie_mapping()
