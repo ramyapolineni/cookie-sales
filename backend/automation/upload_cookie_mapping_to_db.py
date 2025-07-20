@@ -4,17 +4,15 @@ from sqlalchemy import create_engine
 from gspread import service_account
 import gspread_dataframe as gd
 
-MAX_SHARE_COOKIES = 5
+MAX_SHARE_COOKIES = 5  # Set how many 'share-from' columns you want to support
 
 def fetch_and_upload_cookie_mapping():
-    # Load service account credentials
+    # Authenticate with Google Sheets
     gc = service_account(filename="service_account.json")
-
-    # Open spreadsheet
-    print("🔍 Opening 'cookie_mapping' Google Sheet...")
     spreadsheet = gc.open("cookie_mapping")
+    print("🔍 Opening 'cookie_mapping' Google Sheet...")
 
-    # Read sheets
+    # Read tabs
     print("📥 Reading tabs from Google Sheet...")
     transitions_ws = spreadsheet.worksheet("cookie_transitions")
     active_ws = spreadsheet.worksheet("active_cookies")
@@ -22,13 +20,13 @@ def fetch_and_upload_cookie_mapping():
     transitions_df = gd.get_as_dataframe(transitions_ws).dropna(how='all')
     active_df = gd.get_as_dataframe(active_ws).dropna(how='all')
 
-    # Clean headers
+    # Clean column names
     transitions_df.columns = [col.strip() for col in transitions_df.columns]
     active_df.columns = [col.strip() for col in active_df.columns]
 
-    # === Transform transitions_df ===
-    def explode_share_columns(row):
-        takes_from = str(row.get("Takes Share From (Other Cookies)", "")).split(",")
+    # Flatten 'Takes Share from (Other Cookies)' and 'Share % Taken'
+    def flatten_share_columns(row):
+        takes_from = str(row.get("Takes Share from (Other Cookies)", "")).split(",")
         share_pct = str(row.get("Share % Taken", "")).replace("%", "").split(",")
 
         takes_from = [t.strip() for t in takes_from if t.strip()]
@@ -40,19 +38,19 @@ def fetch_and_upload_cookie_mapping():
 
         return row
 
-    transitions_df = transitions_df.apply(explode_share_columns, axis=1)
-    transitions_df.drop(columns=["Takes Share From (Other Cookies)", "Share % Taken"], inplace=True)
+    transitions_df = transitions_df.apply(flatten_share_columns, axis=1)
+    transitions_df.drop(columns=["Takes Share from (Other Cookies)", "Share % Taken"], inplace=True)
 
-    # Upload to DB
+    # Upload to Render DB
     db_url = os.getenv("RENDER_DATABASE_URL")
     if not db_url:
-        raise ValueError("RENDER_DATABASE_URL not set")
+        raise ValueError("RENDER_DATABASE_URL not set in environment variables")
 
     engine = create_engine(db_url)
     transitions_df.to_sql("cookie_transitions", con=engine, if_exists="replace", index=False)
     active_df.to_sql("active_cookies", con=engine, if_exists="replace", index=False)
 
-    print("✅ Uploaded to Render DB: cookie_transitions and active_cookies")
+    print("✅ Uploaded cookie_transitions and active_cookies to Render DB")
 
 if __name__ == "__main__":
     fetch_and_upload_cookie_mapping()
