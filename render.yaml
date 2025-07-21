@@ -8,8 +8,7 @@ services:
     envVars:
       - key: GOOGLE_APPLICATION_CREDENTIALS
         value: backend/automation/cookie-drive-bot.json
-      - key: DATABASE_URL
-        value: <postgresql://cookies_sales_db_user:8AdRDKhNVRYsNojdvFUiAg61rexSMPKr@dpg-d1arinnfte5s73dpbn2g-a.oregon-postgres.render.com/cookies_sales_db>
+      - key: DATABASE_URL #Set as Environment Variable on render
 
 jobs:
   - type: cron
@@ -21,5 +20,5 @@ jobs:
     envVars:
       - key: GOOGLE_APPLICATION_CREDENTIALS
         value: backend/automation/cookie-drive-bot.json
-      - key: DATABASE_URL
-        value: <postgresql://cookies_sales_db_user:8AdRDKhNVRYsNojdvFUiAg61rexSMPKr@dpg-d1arinnfte5s73dpbn2g-a.oregon-postgres.render.com/cookies_sales_db>
+      - key: DATABASE_URL #Set as Environment Variable on render
+  
