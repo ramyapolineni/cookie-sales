@@ -5,6 +5,8 @@ ML-powered platform for predicting Girl Scout cookie sales using historical data
 ## Setup
 
 ```bash
+# Adjust App.js line 20 to point to localhost:5000
+
 # Backend
 pip install -r requirements.txt
 python app.py
