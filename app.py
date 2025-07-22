@@ -130,13 +130,23 @@ def api_predict():
     try:
         # Get request parameters: troop_id and num_girls.
         req_data = request.get_json() or {}
+        print("[DEBUG] Incoming /api/predict payload:", req_data)
         troop_id = str(req_data.get("troop_id", "")).strip()
+        if troop_id.isdigit():
+            troop_id = troop_id.zfill(5)
         input_num_girls = float(req_data.get("num_girls", 0))
         if not troop_id or input_num_girls <= 0:
+            print(f"[DEBUG] Invalid troop_id ({troop_id}) or num_girls ({input_num_girls})")
             return jsonify({"error": "Invalid troop_id or num_girls"}), 400
 
         # Re-load and clean the data.
         df_new = pd.read_csv('FinalCookieSales_2020_2024.csv')
+        df_new = df_new.rename(columns={
+            'SU_Name': 'SU Name',
+            'SU_Num': 'SU #'
+        })
+        print("[DEBUG] Columns in df_new:", df_new.columns.tolist())
+        print("[DEBUG] Unique troop_ids in df_new:", df_new['troop_id'].unique()[:10], "... (total:", len(df_new['troop_id'].unique()), ")")
         df_new.rename(columns={
             'date': 'year',
             'number_cases_sold': 'cases_sold',
@@ -148,13 +158,20 @@ def api_predict():
 
         # Determine the test year: the latest year available for this troop.
         troop_data = df_new[df_new['troop_id'] == troop_id]
+        print(f"[DEBUG] troop_data shape for troop_id {troop_id}: {troop_data.shape}")
+        print(f"[DEBUG] troop_data head:\n", troop_data.head())
         if troop_data.empty:
+            print(f"[DEBUG] No data for troop_id {troop_id}")
             return jsonify({"error": "No data for the specified troop"}), 404
         pred_year = int(troop_data['year'].max())
 
         # Filter test data to only include rows for the test year and troop.
         test = df_new[(df_new['year'] == pred_year) & (df_new['troop_id'] == troop_id)]
+        print(f"[DEBUG] test shape for year {pred_year} and troop_id {troop_id}: {test.shape}")
+        print(f"[DEBUG] test head:\n", test.head())
+        print("[DEBUG] Cookie types in test data:", test['cookie_type'].unique())
         if test.empty:
+            print(f"[DEBUG] No test data for troop_id {troop_id} in year {pred_year}")
             return jsonify([])
 
         # Set parameters for prediction.
@@ -467,6 +484,7 @@ def api_predict():
                 "image_url": url_for('static', filename=cookie_images.get(cookie, "default.png"), _external=True)
             })
 
+        print(f"[DEBUG] Final predictions for troop_id {troop_id}:\n", final_predictions)
         return jsonify(final_predictions)
 
     except Exception as e:
