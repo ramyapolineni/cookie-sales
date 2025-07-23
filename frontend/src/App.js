@@ -644,7 +644,8 @@ function NewTroopSearchPage({ onSearch, onBack }) {
     const [cookieBreakdownData, setCookieBreakdownData] = useState([]);
     const [predictions, setPredictions] = useState({});
     const [cookieTypes, setCookieTypes] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(false); // for analytics/history
+    const [loadingPredictions, setLoadingPredictions] = useState(false); // for predictions only
     const [error, setError] = useState("");
     // Associated SU info (returned by /api/history)
     const [suInfo, setSuInfo] = useState({ su: null, suName: null });
@@ -697,6 +698,7 @@ function NewTroopSearchPage({ onSearch, onBack }) {
   
     // Function to fetch predictions using a given number of girls
     const fetchPredictions = async (girlsVal) => {
+      setLoadingPredictions(true); // <-- Show spinner while fetching predictions
       try {
         console.log("Updating predictions with", Number(girlsVal));
         const res = await fetch(`${API_BASE}/api/predict`, {
@@ -722,6 +724,8 @@ function NewTroopSearchPage({ onSearch, onBack }) {
         setPredictions(formatted);
       } catch (err) {
         console.error("Error fetching predictions:", err);
+      } finally {
+        setLoadingPredictions(false); // <-- Hide spinner after fetching
       }
     };
   
@@ -770,35 +774,42 @@ function NewTroopSearchPage({ onSearch, onBack }) {
           </button>
         </div>
   
+        {/* Loading Spinner for predictions only */}
+        {loadingPredictions && (
+          <div className="spinner" style={{ margin: '40px auto' }}></div>
+        )}
+
         {/* Predictions Grid (appears first, without black background) */}
-        <div style={{ fontSize: "18px", marginBottom: "30px" }}>
-          <h2 style={{ fontSize: "24px", marginBottom: "10px", textAlign: "center" }}>Cookie Predictions</h2>
-          <div className="cookie-grid" style={{ background: "none", padding: "20px" }}>
-            {Object.entries(predictions).map(([cookieName, pred]) => (
-              <div key={cookieName} className="cookie-box" style={{ fontSize: "18px" }}>
-                <img src={pred.imageUrl} alt={cookieName} />
-                <div className="cookie-info">
-                  <div className="cookie-name" style={{ fontSize: "22px" }}>
-                    {cookieName}
-                  </div>
-                  <div className="predicted" style={{ fontSize: "20px" }}>
-                    <strong>Predicted Cases:</strong>{" "}
-                    <span>{pred?.predictedCases?.toFixed(1) ?? "--"}</span>
-                  </div>
-                  <div className="interval" style={{ fontSize: "20px" }}>
-                    <strong>Interval:</strong>{" "}
-                    <span>
-                      {pred
-                        ? `[${pred.interval[0].toFixed(1)}, ${pred.interval[1].toFixed(1)}]`
-                        : "--"}
-                    </span>
+        {!loadingPredictions && (
+          <div style={{ fontSize: "18px", marginBottom: "30px" }}>
+            <h2 style={{ fontSize: "24px", marginBottom: "10px", textAlign: "center" }}>Cookie Predictions</h2>
+            <div className="cookie-grid" style={{ background: "none", padding: "20px" }}>
+              {Object.entries(predictions).map(([cookieName, pred]) => (
+                <div key={cookieName} className="cookie-box" style={{ fontSize: "18px" }}>
+                  <img src={pred.imageUrl} alt={cookieName} />
+                  <div className="cookie-info">
+                    <div className="cookie-name" style={{ fontSize: "22px" }}>
+                      {cookieName}
+                    </div>
+                    <div className="predicted" style={{ fontSize: "20px" }}>
+                      <strong>Predicted Cases:</strong>{" "}
+                      <span>{pred?.predictedCases?.toFixed(1) ?? "--"}</span>
+                    </div>
+                    <div className="interval" style={{ fontSize: "20px" }}>
+                      <strong>Interval:</strong>{" "}
+                      <span>
+                        {pred
+                          ? `[${pred.interval[0].toFixed(1)}, ${pred.interval[1].toFixed(1)}]`
+                          : "--"}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-  
+        )}
+
         {/* Analytics Section */}
         <div className="analytics-title">ANALYTICS</div>
         <div className="analysis-section">

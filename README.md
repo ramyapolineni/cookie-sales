@@ -4,21 +4,6 @@ Production-grade ML-powered platform for predicting cookie sales using historica
 
 ---
 
-## Setup
-
-```bash
-# Adjust frontend API base URL in App.js
-
-# Backend
-pip install -r requirements.txt
-python app.py
-
-# Frontend
-cd frontend
-npm install
-npm start
-```
-
 ## Key Features
 
 **Backend (Flask)**
@@ -36,11 +21,26 @@ npm start
 - PostgreSQL for persistent storage
 - Google Drive API for raw data fetch
 
+## Setup
+
+```bash
+# Adjust frontend API base URL in App.js
+
+# Backend
+pip install -r requirements.txt
+python app.py
+
+# Frontend
+cd frontend
+npm install
+npm start
+```
+
 ## Tech Stack
 
 - **Frontend**: React, Recharts
 - **Backend**: Python (Flask, scikit-learn, pandas, numpy, statsmodels, SQLAlchemy)
-- **Infrastructure**: Render, PostgreSQL, Google Drive APIs
+- **Infrastructure**: Render, PostgreSQL, Google Drive APIs 
 
 ---
 
