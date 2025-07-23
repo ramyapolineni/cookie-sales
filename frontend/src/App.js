@@ -711,11 +711,12 @@ function NewTroopSearchPage({ onSearch, onBack }) {
         const dataPred = await res.json();
         const formatted = {};
         dataPred.forEach((d) => {
-          const key = d.cookie_type.trim().toLowerCase();
+          // Use the cookie_type as is, since backend now provides canonical names
+          const key = d.cookie_type;
           formatted[key] = {
             predictedCases: d.predicted_cases,
             interval: [d.interval_lower, d.interval_upper],
-            imageUrl: d.image_url,
+            imageUrl: d.image_url, // backend provides correct URL
           };
         });
         setPredictions(formatted);
