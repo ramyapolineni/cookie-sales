@@ -13,25 +13,51 @@ from tqdm import tqdm
 from sklearn.linear_model import BayesianRidge
 from scipy.stats import linregress
 import os
+from sqlalchemy import create_engine, text
 
 warnings.simplefilter("ignore", category=RuntimeWarning)
 
 app = Flask(__name__, static_folder="static")
 CORS(app, resources={r"/api/*": {"origins": ["http://localhost:3000", "https://gsci-frontend.onrender.com"]}}, supports_credentials=True)
 
+# -------------------------------
+# DATABASE CONNECTION
+# -------------------------------
+def get_database_connection():
+    """Create database connection using environment variable"""
+    database_url = os.getenv('DATABASE_URL')
+    if database_url:
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        return create_engine(database_url)
+    else:
+        raise Exception("DATABASE_URL not found. Please set it in your environment.")
 
-
+def load_data_from_database():
+    """Load data from PostgreSQL database"""
+    engine = get_database_connection()
+    try:
+        query = "SELECT * FROM final_cookie_sales_all_years"
+        df = pd.read_sql(query, engine)
+        print(f"✅ Successfully loaded {len(df)} rows from database")
+        return df
+    except Exception as e:
+        print(f"❌ Error loading from database: {e}")
+        raise Exception("Could not load data from database.")
 
 # -------------------------------
 # DATA LOADING & PREPROCESSING
 # -------------------------------
-df = pd.read_csv('FinalCookieSales_2020_2024.csv')
+df = load_data_from_database()
 
-# Rename columns to match expected format
-df = df.rename(columns={
-    'SU_Name': 'SU Name',
-    'SU_Num': 'SU #'
-})
+if df is None:
+    raise Exception("Could not load data from database.")
+
+# Remove the backwards renaming - use new column names directly
+# df = df.rename(columns={
+#     'SU_Name': 'SU Name',
+#     'SU_Num': 'SU #'
+# })
 
 df = df.drop(columns=['date'], errors='ignore')
 df = df.dropna()
@@ -115,7 +141,14 @@ def index():
 
 @app.route('/healthz')
 def health_check():
-    return jsonify({"status": "healthy", "timestamp": time.time()}), 200
+    # Check if we're using database or CSV
+    data_source = "database" if get_database_connection() else "csv"
+    return jsonify({
+        "status": "healthy", 
+        "timestamp": time.time(),
+        "data_source": data_source,
+        "data_rows": len(df) if df is not None else 0
+    }), 200
 
 @app.route('/predict')
 def predict_page():
@@ -125,28 +158,24 @@ def predict_page():
 def get_troop_ids():
     return jsonify(sorted(df['troop_id'].unique().tolist()))
 
+# In /api/predict, remove fallback to CSV as well
+# Replace the data loading logic in api_predict to use only the database
 @app.route('/api/predict', methods=['POST'])
 def api_predict():
     try:
         # Get request parameters: troop_id and num_girls.
         req_data = request.get_json() or {}
-        print("[DEBUG] Incoming /api/predict payload:", req_data)
         troop_id = str(req_data.get("troop_id", "")).strip()
-        if troop_id.isdigit():
-            troop_id = troop_id.zfill(5)
         input_num_girls = float(req_data.get("num_girls", 0))
         if not troop_id or input_num_girls <= 0:
-            print(f"[DEBUG] Invalid troop_id ({troop_id}) or num_girls ({input_num_girls})")
             return jsonify({"error": "Invalid troop_id or num_girls"}), 400
 
-        # Re-load and clean the data.
-        df_new = pd.read_csv('FinalCookieSales_2020_2024.csv')
-        df_new = df_new.rename(columns={
-            'SU_Name': 'SU Name',
-            'SU_Num': 'SU #'
-        })
-        print("[DEBUG] Columns in df_new:", df_new.columns.tolist())
-        print("[DEBUG] Unique troop_ids in df_new:", df_new['troop_id'].unique()[:10], "... (total:", len(df_new['troop_id'].unique()), ")")
+        # Load data from database only
+        df_new = load_data_from_database()
+        if df_new is None:
+            return jsonify({"error": "Could not load data"}), 500
+        
+        # Clean and prepare the data
         df_new.rename(columns={
             'date': 'year',
             'number_cases_sold': 'cases_sold',
@@ -158,20 +187,13 @@ def api_predict():
 
         # Determine the test year: the latest year available for this troop.
         troop_data = df_new[df_new['troop_id'] == troop_id]
-        print(f"[DEBUG] troop_data shape for troop_id {troop_id}: {troop_data.shape}")
-        print(f"[DEBUG] troop_data head:\n", troop_data.head())
         if troop_data.empty:
-            print(f"[DEBUG] No data for troop_id {troop_id}")
             return jsonify({"error": "No data for the specified troop"}), 404
         pred_year = int(troop_data['year'].max())
 
         # Filter test data to only include rows for the test year and troop.
         test = df_new[(df_new['year'] == pred_year) & (df_new['troop_id'] == troop_id)]
-        print(f"[DEBUG] test shape for year {pred_year} and troop_id {troop_id}: {test.shape}")
-        print(f"[DEBUG] test head:\n", test.head())
-        print("[DEBUG] Cookie types in test data:", test['cookie_type'].unique())
         if test.empty:
-            print(f"[DEBUG] No test data for troop_id {troop_id} in year {pred_year}")
             return jsonify([])
 
         # Set parameters for prediction.
@@ -180,17 +202,17 @@ def api_predict():
         k_smooth = 5
 
         # Define a mapping for cookie images.
-        cookie_images = {
-            "adventurefuls": "ADVEN.png",
-            "do-si-dos": "DOSI.png",
-            "samoas": "SAM.png",
-            "s'mores": "SMORE.png",
-            "tagalongs": "TAG.png",
-            "thin mints": "THIN.png",
-            "toffee-tastic": "TFTAS.png",
-            "trefoils": "TREF.png",
-            "lemon-ups": "LMNUP.png"
-        }
+        # cookie_images = {
+        #     "adventurefuls": "ADVEN.png",
+        #     "do-si-dos": "DOSI.png",
+        #     "samoas": "SAM.png",
+        #     "s'mores": "SMORE.png",
+        #     "tagalongs": "TAG.png",
+        #     "thin mints": "THIN.png",
+        #     "toffee-tastic": "TFTAS.png",
+        #     "trefoils": "TREF.png",
+        #     "lemon-ups": "LMNUP.png"
+        # }
 
         # Helper to normalize cookie type strings.
         def normalize_cookie_type(raw):
@@ -220,7 +242,7 @@ def api_predict():
                        (df_new['year'] < pred_year) &
                        (df_new['troop_id'] == troop_id)]
         # Group by (year, SU #, cookie_type).
-        grouped = list(train.groupby(['year', 'SU #', 'cookie_type']))
+        grouped = list(train.groupby(['year', 'SU_Num', 'cookie_type']))
         for (yr, su, cookie), group in tqdm(grouped, desc=f"Clustering for {pred_year}", leave=False):
             valid = group[(group['cases_sold'] > 0) & (group['num_girls'] > 0)].copy()
             if valid.empty or len(valid) < 3:
@@ -248,7 +270,7 @@ def api_predict():
         for (t, cookie), group_test in tqdm(test.groupby(['troop_id', 'cookie_type']),
                                               desc=f"Prediction for {pred_year}", leave=False):
             test_row = group_test.iloc[0]
-            su_val = test_row.get("SU #", None)
+            su_val = test_row.get("SU_Num", None)
             key_prefix = (pred_year, t, cookie)
             training_dfs = clusters_by_year.get(key_prefix, [])
             cluster_df = pd.concat(training_dfs, ignore_index=True) if training_dfs else pd.DataFrame()
@@ -370,7 +392,7 @@ def api_predict():
                                                  troop_hist['num_girls'] * avg_pga)
             
             # Candidate 6: SU-level Ridge without clustering.
-            su_data = df_new[(df_new['SU #'] == test_row['SU #']) &
+            su_data = df_new[(df_new['SU_Num'] == test_row['SU_Num']) &
                              (df_new['cookie_type'] == cookie) &
                              (df_new['year'] < pred_year)]
             su_data = su_data[(su_data['cases_sold'] > 0) & (su_data['num_girls'] > 0)]
@@ -422,7 +444,7 @@ def api_predict():
                     "method": best_method,
                     "candidate_mse": best_mse,
                     "cluster_std": cluster_std,
-                    "su": test_row.get("SU #", None)
+                    "su": test_row.get("SU_Num", None)
                 })
 
         # Fallback: if no candidate predictions were generated, use the test data's PGA.
@@ -439,7 +461,7 @@ def api_predict():
                     "method": "fallback_pga",
                     "candidate_mse": None,
                     "cluster_std": None,
-                    "su": test_row.get("SU #", None)
+                    "su": test_row.get("SU_Num", None)
                 })
 
         # Compute the prediction interval for each final prediction using a chain:
@@ -462,7 +484,7 @@ def api_predict():
                 interval_width = 1.96 * cluster_std
             else:
                 if su_val is not None:
-                    su_data_all = df_new[(df_new['SU #'] == su_val) & (df_new['cookie_type'] == cookie)]
+                    su_data_all = df_new[(df_new['SU_Num'] == su_val) & (df_new['cookie_type'] == cookie)]
                     su_std = su_data_all['cases_sold'].std()
                 else:
                     su_std = None
@@ -481,11 +503,63 @@ def api_predict():
                 "predicted_cases": round(predicted_val, 2),
                 "interval_lower": round(max(1, predicted_val - interval_width), 2),
                 "interval_upper": round(predicted_val + interval_width, 2),
-                "image_url": url_for('static', filename=cookie_images.get(cookie, "default.png"), _external=True)
+                "image_url": url_for('static', filename=cookie_image_map.get(cookie, "default.png"), _external=True)
             })
 
-        print(f"[DEBUG] Final predictions for troop_id {troop_id}:\n", final_predictions)
-        return jsonify(final_predictions)
+        # After all_predictions is built, create a forecast dictionary
+        forecast = {pred["cookie_type"]: float(pred["predicted"]) for pred in all_predictions}
+
+        # --- Cookie Transitions Logic ---
+        # Load the cookie_transitions table
+        engine = get_database_connection()
+        transitions_df = pd.read_sql("SELECT * FROM cookie_transitions", engine)
+
+        # Identify cookies with historical data (from df_new)
+        historical_cookies = set(df_new['cookie_type'].unique())
+
+        # For each new cookie in transitions, if no historical data, apply transition logic
+        for idx, row in transitions_df.iterrows():
+            new_cookie = row['New Cookie']
+            replaces_cookie = row['Replaces Cookie']
+            # Only apply if new_cookie has NO historical data
+            if new_cookie not in historical_cookies:
+                # Step 1: Start with the forecast for the replaces cookie
+                base = forecast.get(replaces_cookie, 0)
+                forecast[new_cookie] = base
+                # Step 2: Add share from other cookies
+                for i in range(1, 6):  # MAX_SHARE_COOKIES = 5
+                    share_from = row.get(f'ShareFrom_{i}')
+                    share_pct = row.get(f'SharePct_{i}')
+                    if pd.notnull(share_from) and pd.notnull(share_pct):
+                        add_val = forecast.get(share_from, 0) * (share_pct / 100)
+                        forecast[new_cookie] += add_val
+                        # Optionally: forecast[share_from] -= add_val
+        # Now update final_predictions for new cookies if needed
+        for pred in final_predictions:
+            cookie = pred["cookie_type"]
+            if cookie in forecast:
+                pred["predicted_cases"] = round(forecast[cookie], 2)
+                pred["interval_lower"] = round(max(1, forecast[cookie] - (pred["interval_upper"] - pred["predicted_cases"])), 2)
+                pred["interval_upper"] = round(forecast[cookie] + (pred["interval_upper"] - pred["predicted_cases"]), 2)
+
+        # --- Active Cookies Logic ---
+        # Load the active_cookies table
+        active_df = pd.read_sql("SELECT * FROM active_cookies", engine)
+        active_cookies = set(active_df[active_df['Status'].str.lower() == 'active']['Cookie Name'])
+        # Optionally, get image mapping
+        cookie_image_map = dict(zip(active_df['Cookie Name'], active_df['Image filename']))
+
+        # Filter and update final_predictions to only include active cookies
+        filtered_predictions = []
+        for pred in final_predictions:
+            cookie = pred["cookie_type"]
+            if cookie in active_cookies:
+                # Update image_url if available in active_cookies
+                if cookie in cookie_image_map and cookie_image_map[cookie]:
+                    pred["image_url"] = url_for('static', filename=cookie_image_map[cookie], _external=True)
+                filtered_predictions.append(pred)
+
+        return jsonify(filtered_predictions)
 
     except Exception as e:
         print("Error in /api/predict:", e)
@@ -508,9 +582,9 @@ def get_history(troop_id):
 
     su = None
     suName = None
-    if 'SU #' in troop_df.columns and 'SU Name' in troop_df.columns:
-        su = int(troop_df['SU #'].iloc[0])
-        suName = troop_df['SU Name'].iloc[0]
+    if 'SU_Num' in troop_df.columns and 'SU_Name' in troop_df.columns:
+        su = int(troop_df['SU_Num'].iloc[0])
+        suName = troop_df['SU_Name'].iloc[0]
 
     return jsonify({
         "totalSalesByPeriod": [{"period": int(r['period']), "totalSales": r['number_cases_sold']} for _, r in sales.iterrows()],
@@ -539,11 +613,11 @@ def su_search():
     if not query.isdigit():
         return jsonify([])
 
-    matches = df[df['SU #'].astype(str).str.startswith(query)]
+    matches = df[df['SU_Num'].astype(str).str.startswith(query)]
     results = (
-        matches[['SU #', 'SU Name']]
+        matches[['SU_Num', 'SU_Name']]
         .drop_duplicates()
-        .sort_values('SU #')
+        .sort_values('SU_Num')
         .to_dict(orient='records')
     )
     return jsonify(results)
@@ -551,7 +625,7 @@ def su_search():
 
 @app.route('/api/su_history/<int:su_num>')
 def su_history(su_num):
-    df_su = df[df['SU #'] == su_num]
+    df_su = df[df['SU_Num'] == su_num]
     if df_su.empty:
         return jsonify({"error": "No data"}), 404
 
@@ -587,7 +661,7 @@ def su_scatter_regression(su_num):
     from scipy.stats import linregress
     
     # Filter data for that SU and remove rows with missing values
-    filtered = df[df['SU #'] == su_num].dropna(subset=['number_of_girls', 'number_cases_sold'])
+    filtered = df[df['SU_Num'] == su_num].dropna(subset=['number_of_girls', 'number_cases_sold'])
     if filtered.empty or filtered['number_of_girls'].nunique() < 2:
         # Not enough data to compute regression
         return jsonify({"line": [], "lower": [], "upper": []})
@@ -677,7 +751,7 @@ def regression(troop_id):
 @app.route('/api/regression/<int:su_num>')
 def regression_su(su_num):
     # Filter data for the given SU number
-    su_df = df[df['SU #'] == su_num]
+    su_df = df[df['SU_Num'] == su_num]
     if su_df.empty:
         return jsonify({"error": "No data found for SU"}), 404
 
@@ -739,7 +813,7 @@ def su_predict():
         pred_year = 5
 
         df_su = df[
-            (df['SU #'] == su_num) &
+            (df['SU_Num'] == su_num) &
             (df['number_of_girls'] > 0) &
             (df['number_cases_sold'] > 0) &
             (df['period'] < pred_year)  # Prevent data leakage
@@ -749,17 +823,10 @@ def su_predict():
             return jsonify([])
 
         predictions = []
-        cookie_images = {
-            "Adventurefuls": "ADVEN.png",
-            "Do-Si-Dos": "DOSI.png",
-            "Samoas": "SAM.png",
-            "S'mores": "SMORE.png",
-            "Tagalongs": "TAG.png",
-            "Thin Mints": "THIN.png",
-            "Toffee-tastic": "TFTAS.png",
-            "Trefoils": "TREF.png",
-            "Lemon-Ups": "LMNUP.png"
-        }
+        # Load the active_cookies table
+        engine = get_database_connection()
+        active_df = pd.read_sql("SELECT * FROM active_cookies", engine)
+        cookie_image_map = dict(zip(active_df['Cookie Name'], active_df['Image filename']))
 
         for cookie_type in df_su['canonical_cookie_type'].unique():
             cookie_df = df_su[df_su['canonical_cookie_type'] == cookie_type]
@@ -779,7 +846,7 @@ def su_predict():
             upper = y_pred[0] + 1.96 * std[0]
             pred_val = float(y_pred[0])
 
-            image_url = url_for('static', filename=cookie_images.get(cookie_type, "default.png"), _external=True)
+            image_url = url_for('static', filename=cookie_image_map.get(cookie_type, "default.png"), _external=True)
 
             predictions.append({
                 "cookie_type": cookie_type,
