@@ -282,18 +282,18 @@ function NewTroopSearchPage({ onSearch, onBack }) {
         return;
       }
       const exactMatches = data.filter(
-        (item) => parseInt(item["SU #"], 10) === parseInt(suInput, 10)
+        (item) => parseInt(item["SU_Num"], 10) === parseInt(suInput, 10)
       );
       if (exactMatches.length === 0) {
         setError("No SU found with that number.");
         return;
       }
       const bestMatch = exactMatches.reduce((prev, current) => {
-        return current["SU Name"].length > prev["SU Name"].length
+        return current["SU_Name"].length > prev["SU_Name"].length
           ? current
           : prev;
       });
-      onSearch(bestMatch["SU #"], bestMatch["SU Name"]);
+      onSearch(bestMatch["SU_Num"], bestMatch["SU_Name"]);
     } catch (err) {
       console.error("Error fetching SU info:", err);
       setError("An error occurred while searching. Please try again.");
@@ -331,7 +331,7 @@ function NewTroopSearchPage({ onSearch, onBack }) {
           <strong>Suggestions:</strong>
           <ul style={{ listStyle: "none", padding: 0 }}>
             {suggestions.map((s, i) => (
-              <li key={i}>{s["SU #"]} - {s["SU Name"]}</li>
+              <li key={i}>{s["SU_Num"]} - {s["SU_Name"]}</li>
             ))}
           </ul>
         </div>
