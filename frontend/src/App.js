@@ -79,18 +79,7 @@ function getTrendline(data, xKey, yKey) {
 }
 
 /** Cookie info for the ReturningTroopPage predictions grid */
-const cookies = [
-  { name: "Adventurefuls", image: "ADVEN.png" },
-  { name: "Do-Si-Dos", image: "DOSI.png" },
-  { name: "Lemon-Ups", image: "LMNUP.png" },
-  { name: "Samoas", image: "SAM.png" },
-  { name: "Tagalongs", image: "TAG.png" },
-  { name: "Thin Mints", image: "THIN.png" },
-  { name: "Toffee-tastic", image: "TFTAS.png" },
-  { name: "Trefoils", image: "TREF.png" },
-  { name: "S'mores", image: "SMORE.png" },
-];
-
+// Remove the cookies array with name/image mapping
 
 
 
@@ -316,7 +305,7 @@ function NewTroopSearchPage({ onSearch, onBack }) {
       <p className="subtitle">Enter your SU number and click "Search"</p>
       <div className="input-container">
         <div className="input-box">
-          SU #:{" "}
+          SU Num:{" "}
           <input
             type="text"
             value={suInput}
@@ -417,7 +406,7 @@ function NewTroopSearchPage({ onSearch, onBack }) {
         </header>
         <h1 className="title">SU Analytics</h1>
         <p className="subtitle">
-          Showing analytics for SU #{suNumber}{suName ? ` - ${suName}` : ""}
+          Showing analytics for SU Num {suNumber}{suName ? ` - ${suName}` : ""}
         </p>
   
         <div className="input-container" style={{ marginBottom: "20px" }}>
@@ -762,7 +751,7 @@ function NewTroopSearchPage({ onSearch, onBack }) {
         <p className="subtitle">
           Troop ID: {troopId}{" "}
           {suInfo.su && (
-            <> (Belongs to SU #{suInfo.su} – {suInfo.suName})</>
+            <> (Belongs to SU Num {suInfo.su} – {suInfo.suName})</>
           )}
         </p>
   
@@ -784,35 +773,28 @@ function NewTroopSearchPage({ onSearch, onBack }) {
         <div style={{ fontSize: "18px", marginBottom: "30px" }}>
           <h2 style={{ fontSize: "24px", marginBottom: "10px", textAlign: "center" }}>Cookie Predictions</h2>
           <div className="cookie-grid" style={{ background: "none", padding: "20px" }}>
-            {cookies.map((cookie) => {
-              const key = cookie.name.trim().toLowerCase();
-              const pred = predictions[key];
-              return (
-                <div key={cookie.name} className="cookie-box" style={{ fontSize: "18px" }}>
-                  <img
-                    src={pred?.imageUrl || `${API_BASE}/static/${cookie.image}`}
-                    alt={cookie.name}
-                  />
-                  <div className="cookie-info">
-                    <div className="cookie-name" style={{ fontSize: "22px" }}>
-                      {cookie.name}
-                    </div>
-                    <div className="predicted" style={{ fontSize: "20px" }}>
-                      <strong>Predicted Cases:</strong>{" "}
-                      <span>{pred?.predictedCases?.toFixed(1) ?? "--"}</span>
-                    </div>
-                    <div className="interval" style={{ fontSize: "20px" }}>
-                      <strong>Interval:</strong>{" "}
-                      <span>
-                        {pred
-                          ? `[${pred.interval[0].toFixed(1)}, ${pred.interval[1].toFixed(1)}]`
-                          : "--"}
-                      </span>
-                    </div>
+            {Object.entries(predictions).map(([cookieName, pred]) => (
+              <div key={cookieName} className="cookie-box" style={{ fontSize: "18px" }}>
+                <img src={pred.imageUrl} alt={cookieName} />
+                <div className="cookie-info">
+                  <div className="cookie-name" style={{ fontSize: "22px" }}>
+                    {cookieName}
+                  </div>
+                  <div className="predicted" style={{ fontSize: "20px" }}>
+                    <strong>Predicted Cases:</strong>{" "}
+                    <span>{pred?.predictedCases?.toFixed(1) ?? "--"}</span>
+                  </div>
+                  <div className="interval" style={{ fontSize: "20px" }}>
+                    <strong>Interval:</strong>{" "}
+                    <span>
+                      {pred
+                        ? `[${pred.interval[0].toFixed(1)}, ${pred.interval[1].toFixed(1)}]`
+                        : "--"}
+                    </span>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         </div>
   
