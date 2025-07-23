@@ -163,6 +163,11 @@ def get_troop_ids():
 @app.route('/api/predict', methods=['POST'])
 def api_predict():
     try:
+        # Always load the active_cookies table and build the image map at the start
+        engine = get_database_connection()
+        active_df = pd.read_sql("SELECT * FROM active_cookies", engine)
+        cookie_image_map = dict(zip(active_df['Cookie Name'], active_df['Image filename']))
+
         # Get request parameters: troop_id and num_girls.
         req_data = request.get_json() or {}
         troop_id = str(req_data.get("troop_id", "")).strip()
@@ -503,7 +508,7 @@ def api_predict():
                 "predicted_cases": round(predicted_val, 2),
                 "interval_lower": round(max(1, predicted_val - interval_width), 2),
                 "interval_upper": round(predicted_val + interval_width, 2),
-                "image_url": url_for('static', filename=cookie_image_map.get(cookie, "default.png"), _external=True)
+                "image_url": cookie_image_map.get(cookie, "default.png")
             })
 
         # After all_predictions is built, create a forecast dictionary
