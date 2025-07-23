@@ -4,6 +4,20 @@ Production-grade ML-powered platform for predicting cookie sales using historica
 
 ---
 
+## Tech Stack
+
+- **Backend**: Python - Flask, scikit-learn, pandas, numpy, statsmodels, SQLAlchemy
+- **Frontend**: React, Recharts
+- **Infrastructure**: Render, PostgreSQL, Google Drive APIs
+
+## Key Features
+
+- **Hybrid ML Model Selection**: Automatically chooses the optimal model (Ridge, Bayesian Ridge, K-Means, Linear Regression) for each troop/cookie
+- **Confidence Intervals**: Generates statistical uncertainty bounds for all predictions
+- **Analytics**: Regression lines, scatter plots, and confidence bands for transparency and analysis
+- **RESTful API**: Endpoints for predictions, analytics, and data retrieval
+- **Automated Data Pipeline**: ETL from Google Drive to PostgreSQL, with scheduled retraining and updates.
+
 ## Setup
 
 ```bash
@@ -18,14 +32,6 @@ cd frontend
 npm install
 npm start
 ```
-
-## Key Features
-
-- **Hybrid ML Model Selection**: Automatically chooses the optimal model (Ridge, Bayesian Ridge, K-Means, Linear Regression) for each troop/cookie
-- **Confidence Intervals**: Generates statistical uncertainty bounds for all predictions
-- **Analytics**: Regression lines, scatter plots, and confidence bands for transparency and analysis
-- **RESTful API**: Endpoints for predictions, analytics, and data retrieval
-- **Automated Data Pipeline**: ETL from Google Drive to PostgreSQL, with scheduled retraining and updates.
 
 ## Architecture
 
@@ -42,12 +48,6 @@ npm start
 - Render for deployment
 - PostgreSQL for persistent storage
 - Google Drive API for raw data fetch
-
-## Tech Stack
-
-- **Backend**: Python - Flask, scikit-learn, pandas, numpy, statsmodels, SQLAlchemy
-- **Frontend**: React, Recharts
-- **Infrastructure**: Render, PostgreSQL, Google Drive APIs
 
 ---
 
