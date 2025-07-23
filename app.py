@@ -162,12 +162,11 @@ def get_troop_ids():
 # Replace the data loading logic in api_predict to use only the database
 @app.route('/api/predict', methods=['POST'])
 def api_predict():
+    # Always load the active_cookies table and build the image map at the start
+    engine = get_database_connection()
+    active_df = pd.read_sql("SELECT * FROM active_cookies", engine)
+    cookie_image_map = dict(zip(active_df['Cookie Name'], active_df['Image filename']))
     try:
-        # Always load the active_cookies table and build the image map at the start
-        engine = get_database_connection()
-        active_df = pd.read_sql("SELECT * FROM active_cookies", engine)
-        cookie_image_map = dict(zip(active_df['Cookie Name'], active_df['Image filename']))
-
         # Get request parameters: troop_id and num_girls.
         req_data = request.get_json() or {}
         troop_id = str(req_data.get("troop_id", "")).strip()
@@ -548,12 +547,8 @@ def api_predict():
                 pred["interval_upper"] = round(forecast[cookie] + (pred["interval_upper"] - pred["predicted_cases"]), 2)
 
         # --- Active Cookies Logic ---
-        # Load the active_cookies table
-        active_df = pd.read_sql("SELECT * FROM active_cookies", engine)
+        # Use already loaded active_df and cookie_image_map
         active_cookies = set(active_df[active_df['Status'].str.lower() == 'active']['Cookie Name'])
-        # Optionally, get image mapping
-        cookie_image_map = dict(zip(active_df['Cookie Name'], active_df['Image filename']))
-
         # Filter and update final_predictions to only include active cookies
         filtered_predictions = []
         for pred in final_predictions:
