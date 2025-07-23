@@ -165,7 +165,7 @@ def api_predict():
     # Always load the active_cookies table and build the image map at the start
     engine = get_database_connection()
     active_df = pd.read_sql("SELECT * FROM active_cookies", engine)
-    cookie_image_map = dict(zip(active_df['Cookie Name'], active_df['Image filename']))
+    cookie_image_map = dict(zip(active_df['cookie_type'], active_df['image_filename']))
     try:
         # Get request parameters: troop_id and num_girls.
         req_data = request.get_json() or {}
@@ -548,7 +548,7 @@ def api_predict():
 
         # --- Active Cookies Logic ---
         # Use already loaded active_df and cookie_image_map
-        active_cookies = set(active_df[active_df['Status'].str.lower() == 'active']['Cookie Name'])
+        active_cookies = set(active_df[active_df['status'].str.lower() == 'active']['cookie_type'])
         # Filter and update final_predictions to only include active cookies
         filtered_predictions = []
         for pred in final_predictions:
@@ -826,7 +826,7 @@ def su_predict():
         # Load the active_cookies table
         engine = get_database_connection()
         active_df = pd.read_sql("SELECT * FROM active_cookies", engine)
-        cookie_image_map = dict(zip(active_df['Cookie Name'], active_df['Image filename']))
+        cookie_image_map = dict(zip(active_df['cookie_type'], active_df['image_filename']))
 
         for cookie_type in df_su['canonical_cookie_type'].unique():
             cookie_df = df_su[df_su['canonical_cookie_type'] == cookie_type]
