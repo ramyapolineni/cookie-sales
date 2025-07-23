@@ -1,11 +1,13 @@
 # GS Cookies Sales Forecasting Platform
 
-ML-powered platform for predicting Girl Scout cookie sales using historical data and troop demographics.
+Production-grade ML-powered platform for predicting cookie sales using historical data and troop demographics.
+
+---
 
 ## Setup
 
 ```bash
-# Adjust App.js line 20 to point to localhost:5000
+# Adjust frontend API base URL in App.js
 
 # Backend
 pip install -r requirements.txt
@@ -17,33 +19,36 @@ npm install
 npm start
 ```
 
-## What It Does
+## Key Features
 
-- **Sales Forecasting**: Predicts cases sold per cookie type for individual troops using Ridge regression, Bayesian Ridge, and clustering-based ensemble methods
+- **Hybrid ML Model Selection**: Automatically chooses the optimal model (Ridge, Bayesian Ridge, K-Means, Linear Regression) for each troop/cookie
 - **Confidence Intervals**: Generates statistical uncertainty bounds for all predictions
-- **Analytics**: Provides historical performance analysis and regression insights
-- **RESTful APIs**: Endpoints for predictions and data retrieval
+- **Analytics**: Regression lines, scatter plots, and confidence bands for transparency and analysis
+- **RESTful API**: Endpoints for predictions, analytics, and data retrieval
+- **Automated Data Pipeline**: ETL from Google Drive to PostgreSQL, with scheduled retraining and updates.
 
 ## Architecture
 
 **Backend (Flask)**
-- ML pipeline with scikit-learn (Ridge, Bayesian Ridge, K-Means clustering)
-- Automated ETL pipeline fetching data from Google Drive
+- ML pipeline with scikit-learn (Ridge, Bayesian Ridge, K-Means clustering), pandas, numpy, statsmodels
+- Automated ETL pipeline from Google Drive → PostgreSQL
 - PostgreSQL database for data persistence
 
 **Frontend (React)**
 - Interactive dashboard with Recharts visualizations
-- Real-time prediction interface
+- Real-time prediction interface for new and returning troop analytics
 
-## Data Pipeline
-1. Fetch raw sales/participation data from Google Drive
-2. Clean and standardize data
-3. Apply cookie type mapping and normalization
-4. Merge with historical data (2020-2024)
-5. Generate ML-ready datasets
+**Infrastructure**
+- Render for deployment
+- PostgreSQL for persistent storage
+- Google Drive API for raw data fetch
 
 ## Tech Stack
 
-- **Backend**: Python, Flask, scikit-learn, pandas, numpy, statsmodels
+- **Backend**: Python - Flask, scikit-learn, pandas, numpy, statsmodels, SQLAlchemy
 - **Frontend**: React, Recharts
-- **Infrastructure**: Render, PostgreSQL, Google Drive API 
+- **Infrastructure**: Render, PostgreSQL, Google Drive APIs
+
+---
+
+_Built for Girl Scouts of Central Indiana by Krenicki Center for BA & ML._
