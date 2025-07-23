@@ -6,8 +6,8 @@ Production-grade ML-powered platform for predicting cookie sales using historica
 
 ## Tech Stack
 
-- **Backend**: Python - Flask, scikit-learn, pandas, numpy, statsmodels, SQLAlchemy
 - **Frontend**: React, Recharts
+- **Backend**: Python (Flask, scikit-learn, pandas, numpy, statsmodels, SQLAlchemy)
 - **Infrastructure**: Render, PostgreSQL, Google Drive APIs
 
 ## Key Features
