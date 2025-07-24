@@ -37,20 +37,23 @@ def standardize_cookie_names_from_map(df, name_column, name_map):
     def normalize(name):
         return re.sub(r'[^a-zA-Z0-9]+', '', name).lower()
 
-    def clean_and_map(name):
-        if pd.isna(name):
-            return name
-        cleaned = normalize(name)
-        return name_map.get(cleaned, name.strip().title())
+    # Create normalized version of the raw names for matching
+    df["__normalized_cookie"] = df[name_column].apply(lambda x: normalize(x) if pd.notna(x) else x)
 
-    df[name_column] = df[name_column].apply(clean_and_map)
-
-    # Log unmapped cookie names
+    # Log unmapped names before mapping
     normalized_keys = set(name_map.keys())
-    normalized_column = df[name_column].apply(lambda x: normalize(x) if pd.notna(x) else x)
-    unmapped = df[~normalized_column.isin(normalized_keys)][name_column].unique()
+    unmapped = df[~df["__normalized_cookie"].isin(normalized_keys)][name_column].dropna().unique()
     if len(unmapped):
         print("⚠️ Unmapped cookie names found:", unmapped)
+
+    # Replace with mapped standard_name or fallback to title case of original
+    def apply_mapping(row):
+        key = row["__normalized_cookie"]
+        original = row[name_column]
+        return name_map.get(key, original.strip().title())
+
+    df[name_column] = df.apply(apply_mapping, axis=1)
+    df.drop(columns="__normalized_cookie", inplace=True)
 
     return df
 
