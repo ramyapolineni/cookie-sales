@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import re
 from glob import glob
+from sqlalchemy import create_engine
 
 from fetch_drive_files import fetch_drive_files_from_google
 from transform_to_final_table import (
@@ -11,6 +12,33 @@ from transform_to_final_table import (
     save_final
 )
 from upload_to_render_db import upload_to_render_db  # <-- new import
+
+# === CONFIG: DB CONNECTION ===
+def get_db_engine():
+    db_url = os.getenv("RENDER_DATABASE_URL")  # Ensure this is set in your environment
+    if not db_url:
+        raise ValueError("Missing RENDER_DB_URL in environment variables.")
+    return create_engine(db_url)
+
+# === STEP 0: Fetch active cookie name mappings ===
+def get_standard_cookie_names():
+    engine = get_db_engine()
+    query = "SELECT DISTINCT standard_name FROM active_cookies"
+    df = pd.read_sql(query, engine)
+
+    # Build map: cleaned lowercased raw name → standard name
+    name_map = {row['standard_name'].lower(): row['standard_name'] for _, row in df.iterrows()}
+    return name_map
+
+# === Helper: Clean and apply standard names ===
+def standardize_cookie_names_from_map(df, name_column, name_map):
+    def clean_and_map(name):
+        if pd.isna(name):
+            return name
+        cleaned = name.replace('\n', ' ').replace('  ', ' ').strip().lower()
+        return name_map.get(cleaned, name.strip().title())  # fallback to Title case
+    df[name_column] = df[name_column].apply(clean_and_map)
+    return df
 
 # === STEP 1: Get list of years to process ===
 def get_unprocessed_years():
@@ -76,6 +104,14 @@ if __name__ == "__main__":
     if not new_years:
         print("✅ All available data is already processed.\n")
     else:
+        # Load cookie name mapping from DB
+        try:
+            cookie_map = get_standard_cookie_names()
+            print("🔍 Loaded standard cookie name mappings from database.")
+        except Exception as e:
+            print(f"❌ Failed to load cookie name map: {e}")
+            cookie_map = {}
+
         for year in new_years:
             print(f"\n📦 Processing year {year}...")
 
@@ -86,6 +122,11 @@ if __name__ == "__main__":
                 sales_df = load_and_clean_sales(sales_path, year)
                 part_df = load_and_clean_participation(part_path)
                 merged_df = merge_with_participation(sales_df, part_df)
+
+                # Apply standardization
+                if 'Cookie' in merged_df.columns and cookie_map:
+                    merged_df = standardize_cookie_names_from_map(merged_df, "Cookie", cookie_map)
+
                 save_final(merged_df, year)
             except Exception as e:
                 print(f"⚠️ Failed to process {year}: {e}")
@@ -103,3 +144,4 @@ if __name__ == "__main__":
         print("⚠️ Skipping DB upload: No new data to combine.")
 
     print("\n🎉 Pipeline complete!")
+    
