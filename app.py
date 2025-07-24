@@ -65,7 +65,7 @@ df = df.drop(columns=['date'], errors='ignore')
 df = df.dropna()
 df = df[df['number_cases_sold'] > 0]
 
-df['troop_id'] = df['troop_id'].astype(int)
+# df['troop_id'] = df['troop_id'].astype(int)
 df['period'] = df['period'].astype(int)
 df['number_of_girls'] = df['number_of_girls'].astype(float)
 df['number_cases_sold'] = df['number_cases_sold'].astype(float)
@@ -512,9 +512,14 @@ def api_predict():
 # In app.py, modify /api/history endpoint:
 @app.route('/api/history/<int:troop_id>')
 def get_history(troop_id):
-    troop_df = df[df['troop_id'] == troop_id]
+    print(f"[DEBUG] /api/history called with troop_id={troop_id}")
+    print(f"[DEBUG] troop_id dtype in df: {df['troop_id'].dtype}")
+    print(f"[DEBUG] Sample troop_id values: {df['troop_id'].head(5).tolist()}")
+    troop_df = df[df['troop_id'].astype(str) == str(troop_id)]
+    print(f"[DEBUG] Rows found for troop_id {troop_id}: {len(troop_df)}")
     if troop_df.empty:
-        return jsonify({"error": "No data"}), 404
+        print(f"[DEBUG] No data found for troop_id {troop_id}")
+        return jsonify({"error": f"No data for troop_id {troop_id}"}), 404
 
     sales = troop_df.groupby('period')['number_cases_sold'].sum().reset_index()
     girls = troop_df.groupby('period')['number_of_girls'].mean().reset_index()
@@ -535,8 +540,13 @@ def get_history(troop_id):
 
 @app.route('/api/cookie_breakdown/<int:troop_id>')
 def get_breakdown(troop_id):
-    troop_df = df[df['troop_id'] == troop_id]
+    print(f"[DEBUG] /api/cookie_breakdown called with troop_id={troop_id}")
+    print(f"[DEBUG] troop_id dtype in df: {df['troop_id'].dtype}")
+    print(f"[DEBUG] Sample troop_id values: {df['troop_id'].head(5).tolist()}")
+    troop_df = df[df['troop_id'].astype(str) == str(troop_id)]
+    print(f"[DEBUG] Rows found for troop_id {troop_id}: {len(troop_df)}")
     if troop_df.empty:
+        print(f"[DEBUG] No data found for troop_id {troop_id}")
         return jsonify([])
 
     grouped = troop_df.groupby(['period', 'canonical_cookie_type'])['number_cases_sold'].sum().reset_index()
