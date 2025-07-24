@@ -2,6 +2,7 @@ import pandas as pd
 import os
 import re
 from glob import glob
+from sqlalchemy import create_engine
 
 
 # === LOAD + CLEAN PARTICIPATION FILE ===
@@ -21,6 +22,26 @@ def load_and_clean_participation(file_path):
 
 
 # === LOAD + CLEAN TROOP SALES FILE ===
+# === COOKIE TYPE NORMALIZATION ===
+def get_canonical_cookie_lookup():
+    db_url = os.getenv("RENDER_DATABASE_URL")
+    if not db_url:
+        raise ValueError("RENDER_DATABASE_URL not set in environment variables")
+    engine = create_engine(db_url)
+    active_cookies_df = pd.read_sql_table("active_cookies", con=engine)
+    canonical_names = active_cookies_df.iloc[:, 0].dropna().unique()  # assumes first column is the name
+    lookup = {}
+    for name in canonical_names:
+        cleaned = re.sub(r'[-\s\'"\n]', '', str(name).lower())
+        lookup[cleaned] = name
+    return lookup
+
+def normalize_cookie_type_dynamic(name, canonical_lookup):
+    if pd.isnull(name):
+        return name
+    cleaned = re.sub(r'[-\s\'"\n]', '', str(name).lower())
+    return canonical_lookup.get(cleaned, name)
+
 def load_and_clean_sales(file_path, year):
     sales_df = pd.read_excel(file_path, skiprows=4)
     sales_df.columns = [col.strip().replace('\n', ' ') if isinstance(col, str) else col for col in sales_df.columns]
@@ -40,6 +61,10 @@ def load_and_clean_sales(file_path, year):
         var_name='cookie_type',
         value_name='number_of_cookies_sold'
     )
+
+    # Dynamically fetch canonical names and normalize
+    canonical_lookup = get_canonical_cookie_lookup()
+    melted['cookie_type'] = melted['cookie_type'].apply(lambda x: normalize_cookie_type_dynamic(x, canonical_lookup))
 
     melted['number_cases_sold'] = melted['number_of_cookies_sold'] / 12
     melted.drop(columns=['number_of_cookies_sold'], inplace=True)
@@ -106,7 +131,7 @@ if __name__ == "__main__":
                 sales_df = load_and_clean_sales(sales_path, year)
                 part_df = load_and_clean_participation(part_path)
                 merged_df = merge_with_participation(sales_df, part_df)
-                save_final(final_df, year)
+                save_final(merged_df, year)
 
             except Exception as e:
                 print(f"⚠️ Skipped year {year} due to error: {e}")
