@@ -4,7 +4,7 @@ import re
 from glob import glob
 from sqlalchemy import create_engine
 
-from fetch_drive_files_from_google import fetch_drive_files_from_google
+from fetch_drive_files import fetch_drive_files_from_google
 from transform_to_final_table import (
     load_and_clean_sales,
     load_and_clean_participation,
