@@ -18,6 +18,10 @@ def load_and_clean_participation(file_path):
     })
 
     part_df = part_df[['SU_Name', 'SU_Num', 'troop_id', 'number_of_girls']].copy()
+    # Remove alphabetical characters from troop_id
+    part_df['troop_id'] = part_df['troop_id'].astype(str).str.replace(r'[A-Za-z]', '', regex=True).str.strip()
+    # Drop rows where troop_id is empty after cleaning
+    part_df = part_df[part_df['troop_id'] != '']
     return part_df
 
 
@@ -31,16 +35,20 @@ def get_canonical_cookie_lookup():
     active_cookies_df = pd.read_sql_table("active_cookies", con=engine)
     canonical_names = active_cookies_df.iloc[:, 0].dropna().unique()  # assumes first column is the name
     lookup = {}
+    print("\n[DEBUG] Canonical names from DB:")
     for name in canonical_names:
         cleaned = re.sub(r'\s+|[-\'"`]', '', str(name).lower())
         lookup[cleaned] = name
+        print(f"  Canonical: {repr(name)} | Cleaned: {repr(cleaned)}")
     return lookup
 
 def normalize_cookie_type_dynamic(name, canonical_lookup):
     if pd.isnull(name):
         return name
     cleaned = re.sub(r'\s+|[-\'"`]', '', str(name).lower())
-    return canonical_lookup.get(cleaned, name)
+    result = canonical_lookup.get(cleaned, name)
+    print(f"[DEBUG] Raw: {repr(name)} | Cleaned: {repr(cleaned)} | Normalized: {repr(result)}")
+    return result
 
 def load_and_clean_sales(file_path, year):
     sales_df = pd.read_excel(file_path, skiprows=4)
@@ -62,8 +70,26 @@ def load_and_clean_sales(file_path, year):
         value_name='number_of_cookies_sold'
     )
 
+    # Remove alphabetical characters from troop_id
+    melted['troop_id'] = melted['troop_id'].astype(str).str.replace(r'[A-Za-z]', '', regex=True).str.strip()
+    # Drop rows where troop_id is empty after cleaning
+    melted = melted[melted['troop_id'] != '']
+
     # Dynamically fetch canonical names and normalize
     canonical_lookup = get_canonical_cookie_lookup()
+    print("\n[DEBUG] Sample normalization results:")
+    sample = melted['cookie_type'].dropna().unique()[:10]
+    for s in sample:
+        normalize_cookie_type_dynamic(s, canonical_lookup)
+    
+    # Debug print for first 20 rows of cookie_type normalization
+    print("\n[DEBUG] Row-by-row cookie_type normalization (first 20 rows):")
+    for idx, row in melted.head(20).iterrows():
+        raw = row['cookie_type']
+        cleaned = re.sub(r'\s+|[-\'"`]', '', str(raw).lower())
+        normalized = canonical_lookup.get(cleaned, raw)
+        print(f"  Row {idx}: Raw: {repr(raw)} | Cleaned: {repr(cleaned)} | Normalized: {repr(normalized)}")
+
     melted['cookie_type'] = melted['cookie_type'].apply(lambda x: normalize_cookie_type_dynamic(x, canonical_lookup))
 
     melted['number_cases_sold'] = melted['number_of_cookies_sold'] / 12
