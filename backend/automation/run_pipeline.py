@@ -27,7 +27,7 @@ def get_standard_cookie_names():
     df = pd.read_sql(query, engine)
 
     def normalize(name):
-        return re.sub(r'[^a-zA-Z0-9]+', '', name).strip().lower()
+        return re.sub(r'[^a-zA-Z0-9-]+', '', name).strip().lower()
 
     name_map = {}
     for std in df['standard_name']:
@@ -38,17 +38,20 @@ def get_standard_cookie_names():
 
 # === Helper: Clean and apply standard names ===
 def standardize_cookie_names_from_map(df, name_column, name_map):
+    def normalize(name):
+        return re.sub(r'[^a-zA-Z0-9-]+', '', name).strip().lower()
+
     def clean_and_map(name):
         if pd.isna(name):
             return name
-        cleaned = re.sub(r'[^a-zA-Z0-9]+', '', name).strip().lower()
+        cleaned = normalize(name)
         return name_map.get(cleaned, name.strip().title())  # fallback to Title case
 
     df[name_column] = df[name_column].apply(clean_and_map)
 
     # Log unmapped cookie names
     normalized_keys = set(name_map.keys())
-    normalized_column = df[name_column].apply(lambda x: re.sub(r'[^a-zA-Z0-9]+', '', x).strip().lower() if pd.notna(x) else x)
+    normalized_column = df[name_column].apply(lambda x: normalize(x) if pd.notna(x) else x)
     unmapped = df[~normalized_column.isin(normalized_keys)][name_column].unique()
     if len(unmapped):
         print("⚠️ Unmapped cookie names found:", unmapped)
@@ -142,6 +145,8 @@ if __name__ == "__main__":
                 if 'Cookie' in merged_df.columns and cookie_map:
                     merged_df = standardize_cookie_names_from_map(merged_df, "Cookie", cookie_map)
 
+                print(f"✅ Distinct cookie names after cleaning for {year}:
+", merged_df['Cookie'].dropna().unique())
                 save_final(merged_df, year)
             except Exception as e:
                 print(f"⚠️ Failed to process {year}: {e}")
