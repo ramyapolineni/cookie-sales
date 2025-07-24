@@ -27,9 +27,13 @@ def get_standard_cookie_names():
     df = pd.read_sql(query, engine)
 
     def normalize(name):
-        return re.sub(r'\s+', ' ', name).strip().lower()
+        return re.sub(r'[^a-zA-Z0-9]+', '', name).strip().lower()
 
-    name_map = {normalize(row['standard_name']): row['standard_name'] for _, row in df.iterrows()}
+    name_map = {}
+    for std in df['standard_name']:
+        cleaned = normalize(std)
+        name_map[cleaned] = std.strip()  # retain original name for use
+
     return name_map
 
 # === Helper: Clean and apply standard names ===
@@ -37,13 +41,15 @@ def standardize_cookie_names_from_map(df, name_column, name_map):
     def clean_and_map(name):
         if pd.isna(name):
             return name
-        cleaned = re.sub(r'\s+', ' ', name).strip().lower()
+        cleaned = re.sub(r'[^a-zA-Z0-9]+', '', name).strip().lower()
         return name_map.get(cleaned, name.strip().title())  # fallback to Title case
 
     df[name_column] = df[name_column].apply(clean_and_map)
 
     # Log unmapped cookie names
-    unmapped = df[~df[name_column].str.lower().isin(name_map.keys())][name_column].unique()
+    normalized_keys = set(name_map.keys())
+    normalized_column = df[name_column].apply(lambda x: re.sub(r'[^a-zA-Z0-9]+', '', x).strip().lower() if pd.notna(x) else x)
+    unmapped = df[~normalized_column.isin(normalized_keys)][name_column].unique()
     if len(unmapped):
         print("⚠️ Unmapped cookie names found:", unmapped)
 
