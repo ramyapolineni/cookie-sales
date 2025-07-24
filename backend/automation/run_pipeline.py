@@ -145,8 +145,8 @@ if __name__ == "__main__":
                 if 'Cookie' in merged_df.columns and cookie_map:
                     merged_df = standardize_cookie_names_from_map(merged_df, "Cookie", cookie_map)
 
-                print(f"✅ Distinct cookie names after cleaning for {year}:
-", merged_df['Cookie'].dropna().unique())
+                print(f"✅ Distinct cookie names after cleaning for {year}:")
+                print(merged_df['Cookie'].dropna().unique())
                 save_final(merged_df, year)
             except Exception as e:
                 print(f"⚠️ Failed to process {year}: {e}")
