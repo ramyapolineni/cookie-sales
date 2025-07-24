@@ -32,14 +32,14 @@ def get_canonical_cookie_lookup():
     canonical_names = active_cookies_df.iloc[:, 0].dropna().unique()  # assumes first column is the name
     lookup = {}
     for name in canonical_names:
-        cleaned = re.sub(r'[-\s\'"\n]', '', str(name).lower())
+        cleaned = re.sub(r'\s+|[-\'"`]', '', str(name).lower())
         lookup[cleaned] = name
     return lookup
 
 def normalize_cookie_type_dynamic(name, canonical_lookup):
     if pd.isnull(name):
         return name
-    cleaned = re.sub(r'[-\s\'"\n]', '', str(name).lower())
+    cleaned = re.sub(r'\s+|[-\'"`]', '', str(name).lower())
     return canonical_lookup.get(cleaned, name)
 
 def load_and_clean_sales(file_path, year):
