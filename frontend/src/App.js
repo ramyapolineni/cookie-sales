@@ -652,6 +652,20 @@ function NewTroopSearchPage({ onSearch, onBack }) {
     // State for updating number of girls (prefilled with initial value)
     const [updatedNumGirls, setUpdatedNumGirls] = useState(numGirls);
   
+    // Debug: Log data whenever it changes
+    useEffect(() => {
+      console.log("[DEBUG] girlsData:", girlsData);
+    }, [girlsData]);
+    useEffect(() => {
+      console.log("[DEBUG] salesData:", salesData);
+    }, [salesData]);
+    useEffect(() => {
+      console.log("[DEBUG] cookieBreakdownData:", cookieBreakdownData);
+    }, [cookieBreakdownData]);
+    useEffect(() => {
+      console.log("[DEBUG] cookieTypes:", cookieTypes);
+    }, [cookieTypes]);
+  
     // Fetch history and cookie breakdown data when troopId changes
     useEffect(() => {
       if (!troopId) return;
@@ -813,6 +827,11 @@ function NewTroopSearchPage({ onSearch, onBack }) {
         {/* Analytics Section */}
         <div className="analytics-title">ANALYTICS</div>
         <div className="analysis-section">
+          {/* Debug: Show if any data is empty */}
+          {girlsData.length === 0 && <div style={{color: 'red'}}>No girlsData</div>}
+          {salesData.length === 0 && <div style={{color: 'red'}}>No salesData</div>}
+          {cookieBreakdownData.length === 0 && <div style={{color: 'red'}}>No cookieBreakdownData</div>}
+          {cookieTypes.length === 0 && <div style={{color: 'red'}}>No cookieTypes</div>}
           {/* Total Cookie Cases Sold Chart */}
           <div className="analysis-box">
             <h4>Total Cookie Cases Sold</h4>
