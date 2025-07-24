@@ -17,7 +17,7 @@ from upload_to_render_db import upload_to_render_db  # <-- new import
 def get_db_engine():
     db_url = os.getenv("RENDER_DATABASE_URL")  # Ensure this is set in your environment
     if not db_url:
-        raise ValueError("Missing RENDER_DB_URL in environment variables.")
+        raise ValueError("Missing RENDER_DATABASE_URL in environment variables.")
     return create_engine(db_url)
 
 # === STEP 0: Fetch active cookie name mappings ===
@@ -26,8 +26,10 @@ def get_standard_cookie_names():
     query = "SELECT DISTINCT standard_name FROM active_cookies"
     df = pd.read_sql(query, engine)
 
-    # Build map: cleaned lowercased raw name → standard name
-    name_map = {row['standard_name'].lower(): row['standard_name'] for _, row in df.iterrows()}
+    def normalize(name):
+        return re.sub(r'\s+', ' ', name).strip().lower()
+
+    name_map = {normalize(row['standard_name']): row['standard_name'] for _, row in df.iterrows()}
     return name_map
 
 # === Helper: Clean and apply standard names ===
@@ -35,9 +37,16 @@ def standardize_cookie_names_from_map(df, name_column, name_map):
     def clean_and_map(name):
         if pd.isna(name):
             return name
-        cleaned = name.replace('\n', ' ').replace('  ', ' ').strip().lower()
+        cleaned = re.sub(r'\s+', ' ', name).strip().lower()
         return name_map.get(cleaned, name.strip().title())  # fallback to Title case
+
     df[name_column] = df[name_column].apply(clean_and_map)
+
+    # Log unmapped cookie names
+    unmapped = df[~df[name_column].str.lower().isin(name_map.keys())][name_column].unique()
+    if len(unmapped):
+        print("⚠️ Unmapped cookie names found:", unmapped)
+
     return df
 
 # === STEP 1: Get list of years to process ===
@@ -144,4 +153,3 @@ if __name__ == "__main__":
         print("⚠️ Skipping DB upload: No new data to combine.")
 
     print("\n🎉 Pipeline complete!")
-    
