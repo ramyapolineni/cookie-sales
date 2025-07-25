@@ -870,6 +870,20 @@ def api_predict():
             if cookie in active_cookies:
                 filtered_predictions.append(pred)
         print(f"[DEBUG] Filtered predictions: {filtered_predictions}")
+
+        # --- Ensure ALL active cookies are represented ---
+        for cookie in active_cookies:
+            if not any(p["cookie_type"] == cookie for p in filtered_predictions):
+                filtered_predictions.append({
+                    "cookie_type": cookie,
+                    "predicted_cases": None,
+                    "interval_lower": None,
+                    "interval_upper": None,
+                    "image_url": url_for('static', filename=cookie_image_map.get(cookie, "default.png"), _external=True),
+                    "source": "missing"
+                })
+
+        print(f"[DEBUG] Filtered predictions (completed set): {filtered_predictions}")
         return jsonify(filtered_predictions)
     except Exception as e:
         print("Error in /api/predict:", e)
@@ -1439,6 +1453,19 @@ def su_predict():
         print(f"[DEBUG] Final predictions after all logic: {final_predictions}")
         active_cookies = set(active_df[active_df['status'].str.lower() == 'active']['normalized_cookie_type'])
         filtered_predictions = [pred for pred in final_predictions if pred["cookie_type"] in active_cookies]
+
+        # Ensure every active cookie is present
+        for cookie in active_cookies:
+            if not any(p["cookie_type"] == cookie for p in filtered_predictions):
+                filtered_predictions.append({
+                    "cookie_type": cookie,
+                    "predicted_cases": None,
+                    "interval_lower": None,
+                    "interval_upper": None,
+                    "image_url": url_for('static', filename=cookie_image_map.get(cookie, "default.png"), _external=True),
+                    "source": "missing"
+                })
+
         return jsonify(filtered_predictions)
     except Exception as e:
         print("❌ ERROR in /api/su_predict:", e)

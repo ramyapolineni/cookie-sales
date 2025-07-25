@@ -436,48 +436,50 @@ function NewTroopSearchPage({ onSearch, onBack }) {
           </button>
         </div>
 
-        {/* Loading Spinner for predictions */}
-        {predictionsLoading && (
-          <div className="spinner" style={{ margin: '40px auto' }}></div>
-        )}
-
         {/* Cookie Predictions Section */}
-        {suPredictions.length > 0 && !predictionsLoading && (
-          <div style={{ fontSize: "18px", marginBottom: "30px" }}>
-            <div className="predictions">PREDICTIONS</div>
-            <div className="cookie-grid" style={{ background: "none", padding: "20px" }}>
-              {suPredictions.map((pred, idx) => (
-                <div key={idx} className="cookie-box" style={{ fontSize: "18px" }}>
-                  <img src={pred.image_url} alt={pred.cookie_type} />
-                  <div className="cookie-info">
-                    <div className="cookie-name" style={{ fontSize: "22px" }}>
-                      {pred.cookie_type}
-                    </div>
-                    <div className="predicted" style={{ fontSize: "20px" }}>
-                      <strong>Predicted Cases:</strong> {pred.predicted_cases}
-                    </div>
-                    <div className="interval" style={{ fontSize: "20px" }}>
-                      <strong>Interval:</strong> [{pred.interval_lower}, {pred.interval_upper}]
+        <div style={{ fontSize: "18px", marginBottom: "30px" }}>
+          <div className="predictions">PREDICTIONS</div>
+          {predictionsLoading ? (
+            <div className="spinner" style={{ margin: '40px auto' }}></div>
+          ) : (
+            suPredictions.length > 0 && (
+              <div className="cookie-grid" style={{ background: "none", padding: "20px" }}>
+                {suPredictions.map((pred, idx) => (
+                  <div key={idx} className="cookie-box" style={{ fontSize: "18px" }}>
+                    <img src={pred.image_url} alt={pred.cookie_type} />
+                    <div className="cookie-info">
+                      <div className="cookie-name" style={{ fontSize: "22px" }}>
+                        {pred.cookie_type}
+                      </div>
+                      <div className="predicted" style={{ fontSize: "20px" }}>
+                        <strong>Predicted Cases:</strong>{" "}
+                        {pred.predicted_cases ?? "--"}
+                      </div>
+                      <div className="interval" style={{ fontSize: "20px" }}>
+                        <strong>Interval:</strong>{" "}
+                        {pred.interval_lower != null && pred.interval_upper != null
+                          ? `[${pred.interval_lower}, ${pred.interval_upper}]`
+                          : "--"}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+                ))}
+              </div>
+            )
+          )}
+        </div>
 
         {/* Loading Spinner for analytics data */}
-        {loading && (
-          <div className="spinner" style={{ margin: '40px auto' }}></div>
-        )}
-        {error && <p style={{ color: "red" }}>{error}</p>}
-        
-        {/* Analytics Section */}
-        {!loading && !error && girlsData.length > 0 && salesData.length > 0 && (
-          <>
-            <div className="analytics-title">ANALYTICS</div>
-            <div className="analysis-section">
-            <div className="analysis-box">
+        <div className="analytics-wrapper">
+          <div className="analytics-title">ANALYTICS</div>
+          {loading ? (
+            <div className="spinner" style={{ margin: '40px auto' }}></div>
+          ) : error ? (
+            <p style={{ color: "red" }}>{error}</p>
+          ) : (
+            girlsData.length > 0 && salesData.length > 0 && (
+              <div className="analysis-section">
+                <div className="analysis-box">
               <h4>Avg. Number of Girls by Year</h4>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={girlsData}>
@@ -556,9 +558,10 @@ function NewTroopSearchPage({ onSearch, onBack }) {
                 </div>
               );
             })}
-            </div>
-          </>
-        )}
+              </div>
+            )
+          )}
+        </div>
       </div>
     );
   }
@@ -820,15 +823,12 @@ function NewTroopSearchPage({ onSearch, onBack }) {
           </button>
         </div>
   
-        {/* Loading Spinner for predictions only */}
-        {loadingPredictions && (
-          <div className="spinner" style={{ margin: '40px auto' }}></div>
-        )}
-
-        {/* Predictions Grid (appears first, without black background) */}
-        {!loadingPredictions && (
-          <div style={{ fontSize: "18px", marginBottom: "30px" }}>
-            <div className="predictions">PREDICTIONS</div>
+        {/* Predictions Section */}
+        <div style={{ fontSize: "18px", marginBottom: "30px" }}>
+          <div className="predictions">PREDICTIONS</div>
+          {loadingPredictions ? (
+            <div className="spinner" style={{ margin: '40px auto' }}></div>
+          ) : (
             <div className="cookie-grid" style={{ background: "none", padding: "20px" }}>
               {Object.entries(predictions).map(([cookieName, pred]) => (
                 <div key={cookieName} className="cookie-box" style={{ fontSize: "18px" }}>
@@ -844,7 +844,7 @@ function NewTroopSearchPage({ onSearch, onBack }) {
                     <div className="interval" style={{ fontSize: "20px" }}>
                       <strong>Interval:</strong>{" "}
                       <span>
-                        {pred
+                        {pred && Array.isArray(pred.interval) && typeof pred.interval[0] === "number"
                           ? `[${pred.interval[0].toFixed(1)}, ${pred.interval[1].toFixed(1)}]`
                           : "--"}
                       </span>
@@ -853,8 +853,8 @@ function NewTroopSearchPage({ onSearch, onBack }) {
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Analytics Section */}
         <div className="analytics-title">ANALYTICS</div>
