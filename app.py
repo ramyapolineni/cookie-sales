@@ -627,7 +627,11 @@ def su_search():
 
 @app.route('/api/su_history/<int:su_num>')
 def su_history(su_num):
-    df_su = df[df['SU_Num'] == su_num]
+    # Load data from database only
+    df_new = load_data_from_database()
+    df_new['SU_Num'] = df_new['SU_Num'].astype(str).str.strip() if 'SU_Num' in df_new.columns else df_new['SU #'].astype(str).str.strip()
+    df_new['canonical_cookie_type'] = df_new['cookie_type'].apply(normalize_cookie_type)
+    df_su = df_new[df_new['SU_Num'] == str(su_num)]
     if df_su.empty:
         return jsonify({"error": "No data"}), 404
 
@@ -646,28 +650,25 @@ def su_history(su_num):
 
     return jsonify({
         "girlsByYear": [
-            {"period": int(r['period']), "avgGirls": r['number_of_girls']}
-            for _, r in girls_by_year.iterrows()
+            {"period": int(r['period']), "avgGirls": r['number_of_girls']} for _, r in girls_by_year.iterrows()
         ],
         "salesByYear": [
-            {"period": int(r['period']), "avgSales": r['avgSales']}
-            for _, r in sales_by_year.iterrows()
+            {"period": int(r['period']), "avgSales": r['avgSales']} for _, r in sales_by_year.iterrows()
         ],
         "scatterData": scatter
     })
 
 
-
 @app.route('/api/su_scatter_regression/<int:su_num>')
 def su_scatter_regression(su_num):
     from scipy.stats import linregress
-    
-    # Filter data for that SU and remove rows with missing values
-    filtered = df[df['SU_Num'] == su_num].dropna(subset=['number_of_girls', 'number_cases_sold'])
+    # Load data from database only
+    df_new = load_data_from_database()
+    df_new['SU_Num'] = df_new['SU_Num'].astype(str).str.strip() if 'SU_Num' in df_new.columns else df_new['SU #'].astype(str).str.strip()
+    df_su = df_new[df_new['SU_Num'] == str(su_num)]
+    filtered = df_su.dropna(subset=['number_of_girls', 'number_cases_sold'])
     if filtered.empty or filtered['number_of_girls'].nunique() < 2:
-        # Not enough data to compute regression
         return jsonify({"line": [], "lower": [], "upper": []})
-    
     # Optional: remove outliers from 'number_cases_sold'
     q1 = filtered['number_cases_sold'].quantile(0.25)
     q3 = filtered['number_cases_sold'].quantile(0.75)
@@ -676,16 +677,12 @@ def su_scatter_regression(su_num):
         (filtered['number_cases_sold'] >= q1 - 1.5 * iqr) &
         (filtered['number_cases_sold'] <= q3 + 1.5 * iqr)
     ]
-    
-    # If everything got filtered out, return empty
     if filtered.empty or filtered['number_of_girls'].nunique() < 2:
         return jsonify({"line": [], "lower": [], "upper": []})
-    
     # Run linear regression
     x = filtered['number_of_girls']
     y = filtered['number_cases_sold']
     slope, intercept, r_value, p_value, std_err = linregress(x, y)
-    
     # Build line arrays
     x_vals = sorted(set(x))
     line = []
@@ -693,11 +690,10 @@ def su_scatter_regression(su_num):
     upper = []
     for xi in x_vals:
         pred = slope * xi + intercept
-        margin = 2 * std_err  # you can tweak the multiplier
+        margin = 2 * std_err
         line.append({"x": xi, "y": pred})
         lower.append({"x": xi, "y": pred - margin})
         upper.append({"x": xi, "y": pred + margin})
-    
     return jsonify({"line": line, "lower": lower, "upper": upper})
 
 @app.route('/api/regression/<int:troop_id>')
