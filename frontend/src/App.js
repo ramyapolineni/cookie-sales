@@ -16,7 +16,6 @@ import {
 } from "recharts";
 import "./index.css";
 
-// Adjust this to point to your backend
 //const API_BASE = "http://localhost:5000";
 const API_BASE = process.env.REACT_APP_API_BASE || "https://gsci-backend.onrender.com";
 
@@ -370,31 +369,39 @@ function NewTroopSearchPage({ onSearch, onBack }) {
       fetchHistory();
     }, [suNumber]);
   
+    // Function to fetch SU predictions using a given number of girls
+    const fetchSUPredictions = async (girlsVal) => {
+      setPredictionsLoading(true);
+      try {
+        const res = await fetch(`${API_BASE}/api/su_predict`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            su_number: suNumber,
+            num_girls: Number(girlsVal)
+          }),
+        });
+        const data = await res.json();
+        setSuPredictions(data);
+      } catch (err) {
+        console.error("Error fetching SU predictions:", err);
+      } finally {
+        setPredictionsLoading(false);
+      }
+    };
+
+    // Initial predictions fetch when suNumber is set and predictedGirls has a value
     useEffect(() => {
-      if (!suNumber || !predictedGirls || isNaN(predictedGirls)) return;
-  
-      const fetchSUPredictions = async () => {
-        setPredictionsLoading(true);
-        try {
-          const res = await fetch(`${API_BASE}/api/su_predict`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              su_number: suNumber,
-              num_girls: Number(predictedGirls)
-            }),
-          });
-          const data = await res.json();
-          setSuPredictions(data);
-        } catch (err) {
-          console.error("Error fetching SU predictions:", err);
-        } finally {
-          setPredictionsLoading(false);
-        }
-      };
-  
-      fetchSUPredictions();
-    }, [suNumber, predictedGirls]);
+      if (suNumber && predictedGirls && !isNaN(predictedGirls)) {
+        fetchSUPredictions(predictedGirls);
+      }
+    }, [suNumber]);
+
+    const handleUpdatePredictions = () => {
+      if (predictedGirls && !isNaN(predictedGirls)) {
+        fetchSUPredictions(predictedGirls);
+      }
+    };
   
     return (
       <div className="main-container">
@@ -424,34 +431,52 @@ function NewTroopSearchPage({ onSearch, onBack }) {
             placeholder="Enter a number"
             style={{ width: "80px" }}
           />
+          <button className="predict-button" onClick={handleUpdatePredictions}>
+            Update Predictions
+          </button>
         </div>
 
-        {predictionsLoading && <p>Loading predictions...</p>}
+        {/* Loading Spinner for predictions */}
+        {predictionsLoading && (
+          <div className="spinner" style={{ margin: '40px auto' }}></div>
+        )}
 
+        {/* Cookie Predictions Section */}
         {suPredictions.length > 0 && !predictionsLoading && (
-          <div className="cookie-grid" style={{ background: "none", padding: "20px" }}>
-            <h2>Predicted Cookie Sales for {predictedGirls} Girls</h2>
-            {suPredictions.map((pred, idx) => (
-              <div key={idx} className="cookie-box">
-                <img src={pred.image_url} alt={pred.cookie_type} />
-                <div className="cookie-info">
-                  <div className="cookie-name">{pred.cookie_type}</div>
-                  <div className="predicted">
-                    <strong>Predicted Cases:</strong> {pred.predicted_cases}
-                  </div>
-                  <div className="interval">
-                    <strong>Interval:</strong> [{pred.interval_lower}, {pred.interval_upper}]
+          <div style={{ fontSize: "18px", marginBottom: "30px" }}>
+            <h2 style={{ fontSize: "24px", marginBottom: "10px", textAlign: "center" }}>Cookie Predictions</h2>
+            <div className="cookie-grid" style={{ background: "none", padding: "20px" }}>
+              {suPredictions.map((pred, idx) => (
+                <div key={idx} className="cookie-box" style={{ fontSize: "18px" }}>
+                  <img src={pred.image_url} alt={pred.cookie_type} />
+                  <div className="cookie-info">
+                    <div className="cookie-name" style={{ fontSize: "22px" }}>
+                      {pred.cookie_type}
+                    </div>
+                    <div className="predicted" style={{ fontSize: "20px" }}>
+                      <strong>Predicted Cases:</strong> {pred.predicted_cases}
+                    </div>
+                    <div className="interval" style={{ fontSize: "20px" }}>
+                      <strong>Interval:</strong> [{pred.interval_lower}, {pred.interval_upper}]
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
-  
-        {loading && <p>Loading data...</p>}
+
+        {/* Loading Spinner for analytics data */}
+        {loading && (
+          <div className="spinner" style={{ margin: '40px auto' }}></div>
+        )}
         {error && <p style={{ color: "red" }}>{error}</p>}
+        
+        {/* Analytics Section */}
         {!loading && !error && girlsData.length > 0 && salesData.length > 0 && (
-          <div className="analysis-section">
+          <>
+            <div className="analytics-title">ANALYTICS</div>
+            <div className="analysis-section">
             <div className="analysis-box">
               <h4>Avg. Number of Girls by Year</h4>
               <ResponsiveContainer width="100%" height={300}>
@@ -531,7 +556,8 @@ function NewTroopSearchPage({ onSearch, onBack }) {
                 </div>
               );
             })}
-          </div>
+            </div>
+          </>
         )}
       </div>
     );
