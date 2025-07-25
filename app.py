@@ -61,10 +61,7 @@ if df is None:
 #     'SU_Num': 'SU #'
 # })
 
-df = df.drop(columns=['date'], errors='ignore')
-df = df.dropna()
-df = df[df['number_cases_sold'] > 0]
-
+# DO NOT force troop_id to int, always treat as string
 # df['troop_id'] = df['troop_id'].astype(int)
 df['period'] = df['period'].astype(int)
 df['number_of_girls'] = df['number_of_girls'].astype(float)
