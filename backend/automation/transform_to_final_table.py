@@ -50,8 +50,40 @@ def normalize_cookie_type_dynamic(name, canonical_lookup):
     print(f"[DEBUG] Raw: {repr(name)} | Cleaned: {repr(cleaned)} | Normalized: {repr(result)}")
     return result
 
+def repair_split_cookie_columns(df, canonical_names):
+    # Remove all whitespace and dashes for matching
+    canonical_cleaned = {re.sub(r'\s+|[-\'"`]', '', name.lower()): name for name in canonical_names}
+    new_columns = []
+    skip_next = False
+    columns = list(df.columns)
+    i = 0
+    while i < len(columns):
+        if skip_next:
+            skip_next = False
+            i += 1
+            continue
+        col = columns[i]
+        # Try to combine with next column if not a known id col
+        if i + 1 < len(columns):
+            combined = str(col) + str(columns[i+1])
+            cleaned = re.sub(r'\s+|[-\'"`]', '', combined.lower())
+            if cleaned in canonical_cleaned:
+                new_columns.append(canonical_cleaned[cleaned])
+                skip_next = True
+            else:
+                new_columns.append(col)
+        else:
+            new_columns.append(col)
+        i += 1
+    df.columns = new_columns
+    return df
+
 def load_and_clean_sales(file_path, year):
     sales_df = pd.read_excel(file_path, skiprows=4)
+    # Dynamically fetch canonical names for header repair
+    canonical_lookup = get_canonical_cookie_lookup()
+    canonical_names = list(canonical_lookup.values())
+    sales_df = repair_split_cookie_columns(sales_df, canonical_names)
     sales_df.columns = [col.strip().replace('\n', ' ') if isinstance(col, str) else col for col in sales_df.columns]
 
     sales_df = sales_df.rename(columns={
@@ -75,14 +107,11 @@ def load_and_clean_sales(file_path, year):
     # Drop rows where troop_id is empty after cleaning
     melted = melted[melted['troop_id'] != '']
 
-    # Dynamically fetch canonical names and normalize
-    canonical_lookup = get_canonical_cookie_lookup()
     print("\n[DEBUG] Sample normalization results:")
     sample = melted['cookie_type'].dropna().unique()[:10]
     for s in sample:
         normalize_cookie_type_dynamic(s, canonical_lookup)
     
-    # Debug print for first 20 rows of cookie_type normalization
     print("\n[DEBUG] Row-by-row cookie_type normalization (first 20 rows):")
     for idx, row in melted.head(20).iterrows():
         raw = row['cookie_type']
