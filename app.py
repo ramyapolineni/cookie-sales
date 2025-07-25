@@ -485,6 +485,62 @@ def api_predict():
                 "image_url": image_url
             })
         print(f"[DEBUG] Final predictions before active filter: {final_predictions}")
+        
+        # --- Cookie Transitions Logic ---
+        # Load the cookie_transitions table
+        transitions_df = pd.read_sql("SELECT * FROM cookie_transitions", engine)
+        print(f"[DEBUG] Cookie transitions loaded: {len(transitions_df)} rows")
+        
+        # Identify cookies with historical data (from df_new)
+        historical_cookies = set(df_new['normalized_cookie_type'].unique())
+        print(f"[DEBUG] Historical cookies: {historical_cookies}")
+        
+        # Create forecast dictionary from existing predictions
+        forecast = {pred["cookie_type"]: float(pred["predicted_cases"]) for pred in final_predictions}
+        print(f"[DEBUG] Initial forecast: {forecast}")
+        
+        # For each new cookie in transitions, if no historical data, apply transition logic
+        for idx, row in transitions_df.iterrows():
+            new_cookie = row['New Cookie']
+            replaces_cookie = row['Replaces Cookie']
+            print(f"[DEBUG] Processing transition: {new_cookie} replaces {replaces_cookie}")
+            
+            # Only apply if new_cookie has NO historical data
+            if new_cookie not in historical_cookies:
+                print(f"[DEBUG] {new_cookie} is new, applying transition logic")
+                # Step 1: Start with the forecast for the replaces cookie
+                base = forecast.get(replaces_cookie, 0)
+                forecast[new_cookie] = base
+                print(f"[DEBUG] Base forecast for {new_cookie}: {base}")
+                
+                # Step 2: Add share from other cookies
+                for i in range(1, 6):  # MAX_SHARE_COOKIES = 5
+                    share_from = row.get(f'ShareFrom_{i}')
+                    share_pct = row.get(f'SharePct_{i}')
+                    if pd.notnull(share_from) and pd.notnull(share_pct):
+                        add_val = forecast.get(share_from, 0) * (share_pct / 100)
+                        forecast[new_cookie] += add_val
+                        print(f"[DEBUG] Added {add_val} from {share_from} ({share_pct}%)")
+                
+                print(f"[DEBUG] Final forecast for {new_cookie}: {forecast[new_cookie]}")
+            else:
+                print(f"[DEBUG] {new_cookie} has historical data, skipping transition logic")
+        
+        # Add any new cookies from forecast that are not already in final_predictions
+        existing_cookies = {pred["cookie_type"] for pred in final_predictions}
+        for cookie, value in forecast.items():
+            if cookie not in existing_cookies:
+                print(f"[DEBUG] Adding new cookie to final_predictions: {cookie} with value {value}")
+                final_predictions.append({
+                    "cookie_type": cookie,
+                    "predicted_cases": round(value, 2),
+                    "interval_lower": round(max(1, value - 10), 2),  # Default interval
+                    "interval_upper": round(value + 10, 2),
+                    "image_url": url_for('static', filename=cookie_image_map.get(cookie, "default.png"), _external=True)
+                })
+        
+        print(f"[DEBUG] Final predictions after transitions: {final_predictions}")
+        
         # --- Active Cookies Logic ---
         # Use already loaded active_df and cookie_image_map
         active_cookies = set(active_df[active_df['status'].str.lower() == 'active']['normalized_cookie_type'])
