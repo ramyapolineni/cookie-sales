@@ -213,19 +213,19 @@ def api_predict():
         lambda_default = 10
         k_smooth = 5
 
-        # --- CLUSTERING & PREDICTION LOGIC (unchanged, but use normalized_cookie_type everywhere) ---
         from sklearn.cluster import KMeans
         from sklearn.linear_model import LinearRegression
         from sklearn.metrics import mean_squared_error
         from sklearn.model_selection import KFold
         from kneed import KneeLocator
-        from tqdm import tqdm
         import numpy as np
 
         clusters_by_year = {}
         all_predictions = []
         preds_for_rmse = []
 
+        # --- PREDICT FOR ALL COOKIES PRESENT IN THE DATA (not just active) ---
+        all_cookies = sorted(df_new['normalized_cookie_type'].unique())
         # Use normalized_cookie_type for grouping
         train = df_new[(df_new['year'] >= 2020) & 
                        (df_new['year'] < pred_year) &
@@ -254,17 +254,19 @@ def api_predict():
                 clusters_by_year[key] = []
             clusters_by_year[key].append(valid[['cases_sold', 'num_girls']])
 
-        # Use normalized_cookie_type for test grouping
-        for (t, cookie), group_test in tqdm(test.groupby(['troop_id', 'normalized_cookie_type']), desc=f"Prediction for {pred_year}", leave=False):
+        # --- For each cookie in all_cookies, make a prediction ---
+        for cookie in all_cookies:
+            group_test = test[test['normalized_cookie_type'] == cookie]
+            if group_test.empty:
+                continue
             test_row = group_test.iloc[0]
             su_val = test_row.get("SU_Num", None)
-            key_prefix = (pred_year, t, cookie)
+            key_prefix = (pred_year, troop_id, cookie)
             training_dfs = clusters_by_year.get(key_prefix, [])
             cluster_df = pd.concat(training_dfs, ignore_index=True) if training_dfs else pd.DataFrame()
             cluster_std = cluster_df['cases_sold'].std() if not cluster_df.empty else None
 
             # ... (rest of candidate logic, unchanged, but use normalized_cookie_type everywhere) ...
-            # Candidate 1: Ridge with clustering.
             ridge_cluster_pred, mse_cluster = None, float('inf')
             ridge_troop_pred, mse_troop, lambda_cv = None, float('inf'), None
             lin_pred, mse_lin = None, float('inf')
@@ -301,7 +303,7 @@ def api_predict():
                 mse_cluster = mean_squared_error(y, X @ beta)
 
             # Candidate 2: Ridge on troop only.
-            troop_hist = df_new[(df_new['troop_id'] == t) &
+            troop_hist = df_new[(df_new['troop_id'] == troop_id) &
                                 (df_new['normalized_cookie_type'] == cookie) &
                                 (df_new['year'] < pred_year)]
             troop_hist = troop_hist[(troop_hist['cases_sold'] > 0) & (troop_hist['num_girls'] > 0)]
@@ -430,7 +432,10 @@ def api_predict():
                 })
         # Fallback: if no candidate predictions were generated, use the test data's PGA.
         if not all_predictions:
-            for (t, cookie), group_test in test.groupby(['troop_id', 'normalized_cookie_type']):
+            for cookie in all_cookies:
+                group_test = test[test['normalized_cookie_type'] == cookie]
+                if group_test.empty:
+                    continue
                 test_row = group_test.iloc[0]
                 pga = test_row['cases_sold'] / test_row['num_girls']
                 fallback_pred = pga * input_num_girls
@@ -487,46 +492,35 @@ def api_predict():
         print(f"[DEBUG] Final predictions before active filter: {final_predictions}")
         
         # --- Cookie Transitions Logic ---
-        # Load the cookie_transitions table
         transitions_df = pd.read_sql("SELECT * FROM cookie_transitions", engine)
         print(f"[DEBUG] Cookie transitions loaded: {len(transitions_df)} rows")
-        
-        # Identify cookies with historical data (from df_new)
         historical_cookies = set(df_new['normalized_cookie_type'].unique())
         print(f"[DEBUG] Historical cookies: {historical_cookies}")
-        
-        # Create forecast dictionary from existing predictions
         forecast = {pred["cookie_type"]: float(pred["predicted_cases"]) for pred in final_predictions}
-        print(f"[DEBUG] Initial forecast: {forecast}")
-        
-        # For each new cookie in transitions, if no historical data, apply transition logic
+        print(f"[DEBUG] forecast keys: {list(forecast.keys())}")
         for idx, row in transitions_df.iterrows():
-            new_cookie = row['New Cookie']
-            replaces_cookie = row['Replaces Cookie']
-            print(f"[DEBUG] Processing transition: {new_cookie} replaces {replaces_cookie}")
-            
-            # Only apply if new_cookie has NO historical data
+            new_cookie_raw = row['New Cookie']
+            replaces_cookie_raw = row['Replaces Cookie']
+            new_cookie = normalize_cookie_type(new_cookie_raw)
+            replaces_cookie = normalize_cookie_type(replaces_cookie_raw)
+            print(f"[DEBUG] Processing transition: {new_cookie_raw} (normalized: {new_cookie}) replaces {replaces_cookie_raw} (normalized: {replaces_cookie})")
+            print(f"[DEBUG] forecast.get('{replaces_cookie}') = {forecast.get(replaces_cookie)}")
             if new_cookie not in historical_cookies:
                 print(f"[DEBUG] {new_cookie} is new, applying transition logic")
-                # Step 1: Start with the forecast for the replaces cookie
                 base = forecast.get(replaces_cookie, 0)
                 forecast[new_cookie] = base
                 print(f"[DEBUG] Base forecast for {new_cookie}: {base}")
-                
-                # Step 2: Add share from other cookies
                 for i in range(1, 6):  # MAX_SHARE_COOKIES = 5
-                    share_from = row.get(f'ShareFrom_{i}')
+                    share_from_raw = row.get(f'ShareFrom_{i}')
                     share_pct = row.get(f'SharePct_{i}')
-                    if pd.notnull(share_from) and pd.notnull(share_pct):
+                    if pd.notnull(share_from_raw) and pd.notnull(share_pct):
+                        share_from = normalize_cookie_type(share_from_raw)
                         add_val = forecast.get(share_from, 0) * (share_pct / 100)
                         forecast[new_cookie] += add_val
-                        print(f"[DEBUG] Added {add_val} from {share_from} ({share_pct}%)")
-                
+                        print(f"[DEBUG] Added {add_val} from {share_from_raw} (normalized: {share_from}) ({share_pct}%)")
                 print(f"[DEBUG] Final forecast for {new_cookie}: {forecast[new_cookie]}")
             else:
                 print(f"[DEBUG] {new_cookie} has historical data, skipping transition logic")
-        
-        # Add any new cookies from forecast that are not already in final_predictions
         existing_cookies = {pred["cookie_type"] for pred in final_predictions}
         for cookie, value in forecast.items():
             if cookie not in existing_cookies:
@@ -538,11 +532,9 @@ def api_predict():
                     "interval_upper": round(value + 10, 2),
                     "image_url": url_for('static', filename=cookie_image_map.get(cookie, "default.png"), _external=True)
                 })
-        
         print(f"[DEBUG] Final predictions after transitions: {final_predictions}")
         
         # --- Active Cookies Logic ---
-        # Use already loaded active_df and cookie_image_map
         active_cookies = set(active_df[active_df['status'].str.lower() == 'active']['normalized_cookie_type'])
         print("[DEBUG] active_cookies:", active_cookies)
         # Filter and update final_predictions to only include active cookies
@@ -851,7 +843,8 @@ def su_predict():
         clusters_by_year = {}
         all_predictions = []
         preds_for_rmse = []
-        # Use all years for this SU
+        # --- PREDICT FOR ALL COOKIES PRESENT IN THE DATA (not just active) ---
+        all_cookies = sorted(su_data['normalized_cookie_type'].unique())
         grouped = list(su_data.groupby(['year', su_col, 'normalized_cookie_type']))
         for (yr, su, cookie), group in grouped:
             valid = group[(group['cases_sold'] > 0) & (group['num_girls'] > 0)].copy()
@@ -878,8 +871,7 @@ def su_predict():
         # Use the most recent year for this SU for test data
         pred_year = su_data['year'].max()
         test = su_data[su_data['year'] == pred_year]
-        for cookie in su_data['normalized_cookie_type'].unique():
-            # Use all data for this SU and cookie
+        for cookie in all_cookies:
             group_test = test[test['normalized_cookie_type'] == cookie]
             if group_test.empty:
                 continue
@@ -1011,7 +1003,7 @@ def su_predict():
                 })
         # Fallback: if no candidate predictions were generated, use the test data's PGA.
         if not all_predictions:
-            for cookie in su_data['normalized_cookie_type'].unique():
+            for cookie in all_cookies:
                 group_test = test[test['normalized_cookie_type'] == cookie]
                 if group_test.empty:
                     continue
@@ -1057,15 +1049,18 @@ def su_predict():
         historical_cookies = set(su_data['normalized_cookie_type'].unique())
         forecast = {pred["cookie_type"]: float(pred["predicted_cases"]) for pred in final_predictions}
         for idx, row in transitions_df.iterrows():
-            new_cookie = row['New Cookie']
-            replaces_cookie = row['Replaces Cookie']
+            new_cookie_raw = row['New Cookie']
+            replaces_cookie_raw = row['Replaces Cookie']
+            new_cookie = normalize_cookie_type(new_cookie_raw)
+            replaces_cookie = normalize_cookie_type(replaces_cookie_raw)
             if new_cookie not in historical_cookies:
                 base = forecast.get(replaces_cookie, 0)
                 forecast[new_cookie] = base
                 for i in range(1, 6):
-                    share_from = row.get(f'ShareFrom_{i}')
+                    share_from_raw = row.get(f'ShareFrom_{i}')
                     share_pct = row.get(f'SharePct_{i}')
-                    if pd.notnull(share_from) and pd.notnull(share_pct):
+                    if pd.notnull(share_from_raw) and pd.notnull(share_pct):
+                        share_from = normalize_cookie_type(share_from_raw)
                         add_val = forecast.get(share_from, 0) * (share_pct / 100)
                         forecast[new_cookie] += add_val
         existing_cookies = {pred["cookie_type"] for pred in final_predictions}
