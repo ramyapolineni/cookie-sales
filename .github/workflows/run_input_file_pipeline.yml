@@ -2,6 +2,8 @@ name: Cookie Sales Render Upload
 
 on:
   workflow_dispatch:  # Manual trigger from GitHub UI
+  schedule:
+    - cron: '0 4 1 7 *'  # At 00:00 ET (04:00 UTC) on July 1st every year
 
 jobs:
   run-pipeline:
