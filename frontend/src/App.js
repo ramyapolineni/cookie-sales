@@ -16,8 +16,8 @@ import {
 } from "recharts";
 import "./index.css";
 
-//const API_BASE = "http://localhost:5000";
-const API_BASE = process.env.REACT_APP_API_BASE || "https://gsci-backend.onrender.com";
+const API_BASE = "http://localhost:5000";
+//const API_BASE = process.env.REACT_APP_API_BASE || "https://gsci-backend.onrender.com";
 
 
 /** Helper: convert period integer (e.g., 1, 2, 3...) to actual year (2019 + period) */
