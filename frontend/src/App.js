@@ -16,9 +16,11 @@ import {
 } from "recharts";
 import "./index.css";
 
-const API_BASE = process.env.REACT_APP_API_BASE || "https://gsci-backend.onrender.com";
-//const API_BASE = "http://localhost:5000";
-
+const API_BASE =
+  process.env.REACT_APP_API_BASE ||
+  (window.location.hostname === "localhost"
+    ? "http://localhost:5000"
+    : "https://gsci-backend.onrender.com");
 
 /** Helper: convert period integer (e.g., 1, 2, 3...) to actual year (2019 + period) */
 function periodToYear(period) {
@@ -461,6 +463,11 @@ function NewTroopSearchPage({ onSearch, onBack }) {
                           ? `[${pred.interval_lower}, ${pred.interval_upper}]`
                           : "--"}
                       </div>
+                      {pred.predicted_cases == null && (
+                        <div className="no-data" style={{ fontSize: "14px", color: "#f0ad4e" }}>
+                          Not enough data for prediction
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -839,7 +846,9 @@ function NewTroopSearchPage({ onSearch, onBack }) {
                     </div>
                     <div className="predicted" style={{ fontSize: "20px" }}>
                       <strong>Predicted Cases:</strong>{" "}
-                      <span>{pred?.predictedCases?.toFixed(1) ?? "--"}</span>
+                      <span>
+                        {pred.predictedCases != null ? pred.predictedCases.toFixed(1) : "--"}
+                      </span>
                     </div>
                     <div className="interval" style={{ fontSize: "20px" }}>
                       <strong>Interval:</strong>{" "}
@@ -849,6 +858,11 @@ function NewTroopSearchPage({ onSearch, onBack }) {
                           : "--"}
                       </span>
                     </div>
+                    {pred.predictedCases == null && (
+                      <div className="no-data" style={{ fontSize: "14px", color: "#f0ad4e" }}>
+                        Not enough data for prediction
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
