@@ -16,7 +16,6 @@ import {
 } from "recharts";
 import "./index.css";
 
-// Adjust this to point to your backend
 //const API_BASE = "http://localhost:5000";
 const API_BASE = process.env.REACT_APP_API_BASE || "https://gsci-backend.onrender.com";
 
