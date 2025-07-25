@@ -627,7 +627,11 @@ def su_search():
 
 @app.route('/api/su_history/<int:su_num>')
 def su_history(su_num):
-    df_su = df[df['SU_Num'] == su_num]
+    # Load data from database only
+    df_new = load_data_from_database()
+    df_new['SU_Num'] = df_new['SU_Num'].astype(str).str.strip() if 'SU_Num' in df_new.columns else df_new['SU #'].astype(str).str.strip()
+    df_new['canonical_cookie_type'] = df_new['cookie_type'].apply(normalize_cookie_type)
+    df_su = df_new[df_new['SU_Num'] == str(su_num)]
     if df_su.empty:
         return jsonify({"error": "No data"}), 404
 
@@ -646,28 +650,25 @@ def su_history(su_num):
 
     return jsonify({
         "girlsByYear": [
-            {"period": int(r['period']), "avgGirls": r['number_of_girls']}
-            for _, r in girls_by_year.iterrows()
+            {"period": int(r['period']), "avgGirls": r['number_of_girls']} for _, r in girls_by_year.iterrows()
         ],
         "salesByYear": [
-            {"period": int(r['period']), "avgSales": r['avgSales']}
-            for _, r in sales_by_year.iterrows()
+            {"period": int(r['period']), "avgSales": r['avgSales']} for _, r in sales_by_year.iterrows()
         ],
         "scatterData": scatter
     })
 
 
-
 @app.route('/api/su_scatter_regression/<int:su_num>')
 def su_scatter_regression(su_num):
     from scipy.stats import linregress
-    
-    # Filter data for that SU and remove rows with missing values
-    filtered = df[df['SU_Num'] == su_num].dropna(subset=['number_of_girls', 'number_cases_sold'])
+    # Load data from database only
+    df_new = load_data_from_database()
+    df_new['SU_Num'] = df_new['SU_Num'].astype(str).str.strip() if 'SU_Num' in df_new.columns else df_new['SU #'].astype(str).str.strip()
+    df_su = df_new[df_new['SU_Num'] == str(su_num)]
+    filtered = df_su.dropna(subset=['number_of_girls', 'number_cases_sold'])
     if filtered.empty or filtered['number_of_girls'].nunique() < 2:
-        # Not enough data to compute regression
         return jsonify({"line": [], "lower": [], "upper": []})
-    
     # Optional: remove outliers from 'number_cases_sold'
     q1 = filtered['number_cases_sold'].quantile(0.25)
     q3 = filtered['number_cases_sold'].quantile(0.75)
@@ -676,16 +677,12 @@ def su_scatter_regression(su_num):
         (filtered['number_cases_sold'] >= q1 - 1.5 * iqr) &
         (filtered['number_cases_sold'] <= q3 + 1.5 * iqr)
     ]
-    
-    # If everything got filtered out, return empty
     if filtered.empty or filtered['number_of_girls'].nunique() < 2:
         return jsonify({"line": [], "lower": [], "upper": []})
-    
     # Run linear regression
     x = filtered['number_of_girls']
     y = filtered['number_cases_sold']
     slope, intercept, r_value, p_value, std_err = linregress(x, y)
-    
     # Build line arrays
     x_vals = sorted(set(x))
     line = []
@@ -693,11 +690,10 @@ def su_scatter_regression(su_num):
     upper = []
     for xi in x_vals:
         pred = slope * xi + intercept
-        margin = 2 * std_err  # you can tweak the multiplier
+        margin = 2 * std_err
         line.append({"x": xi, "y": pred})
         lower.append({"x": xi, "y": pred - margin})
         upper.append({"x": xi, "y": pred + margin})
-    
     return jsonify({"line": line, "lower": lower, "upper": upper})
 
 @app.route('/api/regression/<int:troop_id>')
@@ -809,56 +805,282 @@ def regression_su(su_num):
 def su_predict():
     try:
         data = request.get_json()
-        print("📦 Received data:", data)
-        su_num = int(data.get('su_number'))
+        print("[DEBUG] /api/su_predict received:", data)
+        su_num = str(data.get('su_number')).strip()
         num_girls = float(data.get('num_girls'))
-        pred_year = 5
+        if not su_num or num_girls <= 0:
+            return jsonify({"error": "Invalid su_number or num_girls"}), 400
 
-        df_su = df[
-            (df['SU_Num'] == su_num) &
-            (df['number_of_girls'] > 0) &
-            (df['number_cases_sold'] > 0) &
-            (df['period'] < pred_year)  # Prevent data leakage
-        ].copy()
+        # Load data from database only
+        df_new = load_data_from_database()
+        df_new.rename(columns={
+            'date': 'year',
+            'number_cases_sold': 'cases_sold',
+            'number_of_girls': 'num_girls'
+        }, inplace=True)
+        df_new['year'] = df_new['year'].astype(int)
+        df_new['troop_id'] = df_new['troop_id'].astype(str).str.strip()
+        df_new['SU_Num'] = df_new['SU_Num'].astype(str).str.strip() if 'SU_Num' in df_new.columns else df_new['SU #'].astype(str).str.strip()
+        df_new['cookie_type'] = df_new['cookie_type'].str.strip().str.lower()
+        df_new['normalized_cookie_type'] = df_new['cookie_type'].apply(normalize_cookie_type)
 
-        if df_su.empty:
-            return jsonify([])
+        # Filter for the selected SU
+        su_col = 'SU_Num' if 'SU_Num' in df_new.columns else 'SU #' if 'SU #' in df_new.columns else None
+        if su_col is None:
+            return jsonify({"error": "SU column not found in data"}), 500
+        su_data = df_new[df_new[su_col] == su_num]
+        if su_data.empty:
+            return jsonify({"error": "No data for the specified SU"}), 404
 
-        predictions = []
-        # Load the active_cookies table
+        # Load active_cookies and build image map
         engine = get_database_connection()
         active_df = pd.read_sql("SELECT * FROM active_cookies", engine)
-        cookie_image_map = dict(zip(active_df['cookie_type'], active_df['image_filename']))
+        active_df['normalized_cookie_type'] = active_df['cookie_type'].apply(normalize_cookie_type)
+        cookie_image_map = dict(zip(active_df['normalized_cookie_type'], active_df['image_filename']))
 
-        for cookie_type in df_su['canonical_cookie_type'].unique():
-            cookie_df = df_su[df_su['canonical_cookie_type'] == cookie_type]
-            if len(cookie_df) < 3:
+        # Modeling and prediction logic (same as /api/predict, but by SU)
+        lambda_grid = [0.1, 1, 5, 10, 50, 100]
+        lambda_default = 10
+        k_smooth = 5
+        from sklearn.cluster import KMeans
+        from sklearn.linear_model import LinearRegression
+        from sklearn.metrics import mean_squared_error
+        from sklearn.model_selection import KFold
+        from kneed import KneeLocator
+        import numpy as np
+        clusters_by_year = {}
+        all_predictions = []
+        preds_for_rmse = []
+        # Use all years for this SU
+        grouped = list(su_data.groupby(['year', su_col, 'normalized_cookie_type']))
+        for (yr, su, cookie), group in grouped:
+            valid = group[(group['cases_sold'] > 0) & (group['num_girls'] > 0)].copy()
+            if valid.empty or len(valid) < 3:
                 continue
-
-            X = np.c_[np.ones(len(cookie_df)), cookie_df['number_of_girls'].values]
-            y = cookie_df['number_cases_sold'].values
-
-            model = BayesianRidge(fit_intercept=False)
-            model.fit(X, y)
-
-            X_pred = np.array([[1, num_girls]])
-            y_pred, std = model.predict(X_pred, return_std=True)
-
-            lower = max(1, y_pred[0] - 1.96 * std[0])
-            upper = y_pred[0] + 1.96 * std[0]
-            pred_val = float(y_pred[0])
-
-            image_url = url_for('static', filename=cookie_image_map.get(cookie_type, "default.png"), _external=True)
-
-            predictions.append({
-                "cookie_type": cookie_type,
-                "predicted_cases": round(pred_val, 2),
-                "interval_lower": round(lower, 2),
-                "interval_upper": round(upper, 2),
+            valid['pga'] = valid['cases_sold'] / valid['num_girls']
+            X = valid[['pga']].values
+            max_k = min(10, len(X))
+            wcss = []
+            for k in range(1, max_k + 1):
+                kmeans = KMeans(n_clusters=k, random_state=42, n_init="auto").fit(X)
+                wcss.append(kmeans.inertia_)
+            try:
+                knee = KneeLocator(range(1, max_k + 1), wcss, curve='convex', direction='decreasing')
+                optimal_k = knee.knee if knee.knee is not None else 1
+            except Exception:
+                optimal_k = 1
+            kmeans = KMeans(n_clusters=optimal_k, random_state=42, n_init="auto").fit(X)
+            valid['cluster'] = kmeans.predict(X)
+            key = (yr, su, cookie)
+            if key not in clusters_by_year:
+                clusters_by_year[key] = []
+            clusters_by_year[key].append(valid[['cases_sold', 'num_girls']])
+        # Use the most recent year for this SU for test data
+        pred_year = su_data['year'].max()
+        test = su_data[su_data['year'] == pred_year]
+        for cookie in su_data['normalized_cookie_type'].unique():
+            # Use all data for this SU and cookie
+            group_test = test[test['normalized_cookie_type'] == cookie]
+            if group_test.empty:
+                continue
+            test_row = group_test.iloc[0]
+            su_val = test_row.get(su_col, None)
+            key_prefix = (pred_year, su_val, cookie)
+            training_dfs = clusters_by_year.get(key_prefix, [])
+            cluster_df = pd.concat(training_dfs, ignore_index=True) if training_dfs else pd.DataFrame()
+            cluster_std = cluster_df['cases_sold'].std() if not cluster_df.empty else None
+            # Candidate logic (same as /api/predict)
+            ridge_cluster_pred, mse_cluster = None, float('inf')
+            ridge_su_pred, mse_su, lambda_cv = None, float('inf'), None
+            lin_pred, mse_lin = None, float('inf')
+            pga_last_pred, mse_pga_last = None, float('inf')
+            pga_avg_pred, mse_pga_avg = None, float('inf')
+            if not cluster_df.empty and len(cluster_df) >= 2:
+                X = np.c_[np.ones(len(cluster_df)), cluster_df['num_girls'].values]
+                y = cluster_df['cases_sold'].values.reshape(-1, 1)
+                kf = KFold(n_splits=min(len(cluster_df), 5), shuffle=True, random_state=42)
+                best_lambda = lambda_default
+                best_mse = float('inf')
+                for lam in lambda_grid:
+                    mses = []
+                    for train_idx, val_idx in kf.split(X):
+                        X_tr, X_val = X[train_idx], X[val_idx]
+                        y_tr, y_val = y[train_idx], y[val_idx]
+                        I = np.eye(X.shape[1])
+                        I[0, 0] = 0
+                        beta = np.linalg.inv(X_tr.T @ X_tr + lam * I).dot(X_tr.T @ y_tr)
+                        y_val_pred = X_val @ beta
+                        mses.append(mean_squared_error(y_val, y_val_pred))
+                    avg_mse = np.mean(mses)
+                    if avg_mse < best_mse:
+                        best_mse = avg_mse
+                        best_lambda = lam
+                alpha = len(cluster_df) / (len(cluster_df) + k_smooth)
+                lambda_final = alpha * best_lambda + (1 - alpha) * lambda_default
+                I = np.eye(X.shape[1])
+                I[0, 0] = 0
+                beta = np.linalg.inv(X.T @ X + lambda_final * I).dot(X.T @ y)
+                ridge_cluster_pred = np.array([1, num_girls]) @ beta
+                mse_cluster = mean_squared_error(y, X @ beta)
+            # Candidate 2: Ridge on SU only
+            su_hist = su_data[(su_data[su_col] == su_val) & (su_data['normalized_cookie_type'] == cookie)]
+            su_hist = su_hist[(su_hist['cases_sold'] > 0) & (su_hist['num_girls'] > 0)]
+            n_train = len(su_hist)
+            if n_train > 1:
+                X_su = np.c_[np.ones(n_train), su_hist['num_girls'].values]
+                y_su = su_hist['cases_sold'].values.reshape(-1, 1)
+                if n_train == 2:
+                    best_mse = float('inf')
+                    for lam in lambda_grid:
+                        X_tr, X_val = X_su[:1], X_su[1:]
+                        y_tr, y_val = y_su[:1], y_su[1:]
+                        I = np.eye(X_su.shape[1])
+                        I[0, 0] = 0
+                        beta_temp = np.linalg.inv(X_tr.T @ X_tr + lam * I).dot(X_tr.T @ y_tr)
+                        y_pred_temp = X_val @ beta_temp
+                        mse_val = mean_squared_error(y_val, y_pred_temp)
+                        if mse_val < best_mse:
+                            best_mse = mse_val
+                            lambda_cv = lam
+                elif n_train >= 3:
+                    kf = KFold(n_splits=min(n_train, 3), shuffle=True, random_state=42)
+                    best_mse = float('inf')
+                    for lam in lambda_grid:
+                        mses = []
+                        for train_idx, val_idx in kf.split(X_su):
+                            X_tr, X_val = X_su[train_idx], X_su[val_idx]
+                            y_tr, y_val = y_su[train_idx], y_su[val_idx]
+                            I = np.eye(X_su.shape[1])
+                            I[0, 0] = 0
+                            beta_temp = np.linalg.inv(X_tr.T @ X_tr + lam * I).dot(X_tr.T @ y_tr)
+                            y_pred_temp = X_val @ beta_temp
+                            mses.append(mean_squared_error(y_val, y_pred_temp))
+                        avg_mse = np.mean(mses)
+                        if avg_mse < best_mse:
+                            best_mse = avg_mse
+                            lambda_cv = lam
+                else:
+                    lambda_cv = lambda_default
+                if lambda_cv is not None:
+                    alpha = n_train / (n_train + k_smooth)
+                    lambda_final_su = alpha * lambda_cv + (1 - alpha) * lambda_default
+                    I = np.eye(X_su.shape[1])
+                    I[0, 0] = 0
+                    beta = np.linalg.inv(X_su.T @ X_su + lambda_final_su * I).dot(X_su.T @ y_su)
+                    ridge_su_pred = np.array([1, num_girls]) @ beta
+                    mse_su = mean_squared_error(y_su, X_su @ beta)
+            else:
+                ridge_su_pred = None
+                mse_su = float('inf')
+            # Candidate 3: Linear Regression
+            if n_train >= 2:
+                model = LinearRegression().fit(su_hist[['num_girls']], su_hist['cases_sold'])
+                lin_pred = model.predict([[num_girls]])[0]
+                mse_lin = mean_squared_error(su_hist['cases_sold'], model.predict(su_hist[['num_girls']]))
+            # Candidate 4: Last Year PGA Prediction
+            if not su_hist.empty:
+                last_year = su_hist['year'].max()
+                last_row = su_hist[su_hist['year'] == last_year].iloc[0]
+                pga_last = last_row['cases_sold'] / last_row['num_girls']
+                pga_last_pred = pga_last * num_girls
+                mse_pga_last = mean_squared_error([last_row['cases_sold']], [pga_last * last_row['num_girls']])
+            # Candidate 5: Average PGA Prediction
+            if not su_hist.empty:
+                avg_pga = (su_hist['cases_sold'] / su_hist['num_girls']).mean()
+                pga_avg_pred = avg_pga * num_girls
+                mse_pga_avg = mean_squared_error(su_hist['cases_sold'], su_hist['num_girls'] * avg_pga)
+            # Choose the best candidate prediction
+            candidates = [
+                ('cluster_ridge', ridge_cluster_pred, mse_cluster),
+                ('su_ridge', ridge_su_pred, mse_su),
+                ('linreg', lin_pred, mse_lin),
+                ('pga_last', pga_last_pred, mse_pga_last),
+                ('pga_avg', pga_avg_pred, mse_pga_avg)
+            ]
+            valid_candidates = [(name, pred, err) for name, pred, err in candidates if pred is not None and not np.isnan(pred)]
+            if valid_candidates:
+                best_method, best_pred, best_mse = min(valid_candidates, key=lambda x: x[2])
+                preds_for_rmse.append(best_pred)
+                all_predictions.append({
+                    "su": su_num,
+                    "cookie_type": cookie,
+                    "predicted": best_pred,
+                    "method": best_method,
+                    "candidate_mse": best_mse,
+                    "cluster_std": cluster_std
+                })
+        # Fallback: if no candidate predictions were generated, use the test data's PGA.
+        if not all_predictions:
+            for cookie in su_data['normalized_cookie_type'].unique():
+                group_test = test[test['normalized_cookie_type'] == cookie]
+                if group_test.empty:
+                    continue
+                test_row = group_test.iloc[0]
+                pga = test_row['cases_sold'] / test_row['num_girls']
+                fallback_pred = pga * num_girls
+                all_predictions.append({
+                    "su": su_num,
+                    "cookie_type": cookie,
+                    "predicted": fallback_pred,
+                    "method": "fallback_pga",
+                    "candidate_mse": None,
+                    "cluster_std": None
+                })
+        # Compute the prediction interval for each final prediction
+        final_predictions = []
+        for pred in all_predictions:
+            cookie = pred["cookie_type"]
+            predicted_val = float(pred["predicted"])
+            candidate_mse = pred.get("candidate_mse", None)
+            cluster_std = pred.get("cluster_std", None)
+            if candidate_mse is not None and candidate_mse > 0:
+                candidate_std = np.sqrt(candidate_mse)
+                interval_width = 1.96 * candidate_std
+            elif cluster_std is not None and not np.isnan(cluster_std):
+                interval_width = 1.96 * cluster_std
+            else:
+                if preds_for_rmse:
+                    overall_rmse = np.sqrt(mean_squared_error(preds_for_rmse, preds_for_rmse))
+                    interval_width = overall_rmse * 2 if overall_rmse > 0 else 10
+                else:
+                    interval_width = 10
+            image_url = url_for('static', filename=cookie_image_map.get(cookie, "default.png"), _external=True)
+            final_predictions.append({
+                "cookie_type": cookie,
+                "predicted_cases": round(predicted_val, 2),
+                "interval_lower": round(max(1, predicted_val - interval_width), 2),
+                "interval_upper": round(predicted_val + interval_width, 2),
                 "image_url": image_url
             })
-
-        return jsonify(predictions)
+        # --- Cookie Transitions Logic ---
+        transitions_df = pd.read_sql("SELECT * FROM cookie_transitions", engine)
+        historical_cookies = set(su_data['normalized_cookie_type'].unique())
+        forecast = {pred["cookie_type"]: float(pred["predicted_cases"]) for pred in final_predictions}
+        for idx, row in transitions_df.iterrows():
+            new_cookie = row['New Cookie']
+            replaces_cookie = row['Replaces Cookie']
+            if new_cookie not in historical_cookies:
+                base = forecast.get(replaces_cookie, 0)
+                forecast[new_cookie] = base
+                for i in range(1, 6):
+                    share_from = row.get(f'ShareFrom_{i}')
+                    share_pct = row.get(f'SharePct_{i}')
+                    if pd.notnull(share_from) and pd.notnull(share_pct):
+                        add_val = forecast.get(share_from, 0) * (share_pct / 100)
+                        forecast[new_cookie] += add_val
+        existing_cookies = {pred["cookie_type"] for pred in final_predictions}
+        for cookie, value in forecast.items():
+            if cookie not in existing_cookies:
+                final_predictions.append({
+                    "cookie_type": cookie,
+                    "predicted_cases": round(value, 2),
+                    "interval_lower": round(max(1, value - 10), 2),
+                    "interval_upper": round(value + 10, 2),
+                    "image_url": url_for('static', filename=cookie_image_map.get(cookie, "default.png"), _external=True)
+                })
+        active_cookies = set(active_df[active_df['status'].str.lower() == 'active']['normalized_cookie_type'])
+        filtered_predictions = [pred for pred in final_predictions if pred["cookie_type"] in active_cookies]
+        return jsonify(filtered_predictions)
     except Exception as e:
         print("❌ ERROR in /api/su_predict:", e)
         return jsonify({"error": str(e)}), 500
