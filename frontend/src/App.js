@@ -16,8 +16,8 @@ import {
 } from "recharts";
 import "./index.css";
 
-const API_BASE = "http://localhost:5000";
-//const API_BASE = process.env.REACT_APP_API_BASE || "https://gsci-backend.onrender.com";
+const API_BASE = process.env.REACT_APP_API_BASE || "https://gsci-backend.onrender.com";
+//const API_BASE = "http://localhost:5000";
 
 
 /** Helper: convert period integer (e.g., 1, 2, 3...) to actual year (2019 + period) */
@@ -415,9 +415,9 @@ function NewTroopSearchPage({ onSearch, onBack }) {
           </div>
           <button className="manual" onClick={onBack}>Back</button>
         </header>
-        <h1 className="title">SU Analytics</h1>
+        <h1 className="title">SU Dashboard</h1>
         <p className="subtitle">
-          Showing analytics for SU Num {suNumber}{suName ? ` - ${suName}` : ""}
+          Showing analytics for SU #{suNumber}{suName ? ` - ${suName}` : ""}
         </p>
   
         <div className="input-container" style={{ marginBottom: "20px" }}>
@@ -444,7 +444,7 @@ function NewTroopSearchPage({ onSearch, onBack }) {
         {/* Cookie Predictions Section */}
         {suPredictions.length > 0 && !predictionsLoading && (
           <div style={{ fontSize: "18px", marginBottom: "30px" }}>
-            <h2 style={{ fontSize: "24px", marginBottom: "10px", textAlign: "center" }}>Cookie Predictions</h2>
+            <div className="predictions">PREDICTIONS</div>
             <div className="cookie-grid" style={{ background: "none", padding: "20px" }}>
               {suPredictions.map((pred, idx) => (
                 <div key={idx} className="cookie-box" style={{ fontSize: "18px" }}>
@@ -798,11 +798,11 @@ function NewTroopSearchPage({ onSearch, onBack }) {
           </div>
           <button className="manual" onClick={onBack}>Back</button>
         </header>
-        <h1 className="title">Analytics & Predictions</h1>
+        <h1 className="title">Troop Dashboard</h1>
         <p className="subtitle">
-          Troop ID: {troopId}{" "}
+          Troop ID: {troopId}
           {suInfo.su && (
-            <> (Belongs to SU Num {suInfo.su} – {suInfo.suName})</>
+            <> (SU #{suInfo.su} – {suInfo.suName})</>
           )}
         </p>
   
@@ -828,7 +828,7 @@ function NewTroopSearchPage({ onSearch, onBack }) {
         {/* Predictions Grid (appears first, without black background) */}
         {!loadingPredictions && (
           <div style={{ fontSize: "18px", marginBottom: "30px" }}>
-            <h2 style={{ fontSize: "24px", marginBottom: "10px", textAlign: "center" }}>Cookie Predictions</h2>
+            <div className="predictions">PREDICTIONS</div>
             <div className="cookie-grid" style={{ background: "none", padding: "20px" }}>
               {Object.entries(predictions).map(([cookieName, pred]) => (
                 <div key={cookieName} className="cookie-box" style={{ fontSize: "18px" }}>
