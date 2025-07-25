@@ -345,6 +345,7 @@ function NewTroopSearchPage({ onSearch, onBack }) {
     const [error, setError] = useState("");
     const [predictedGirls, setPredictedGirls] = useState("");
     const [suPredictions, setSuPredictions] = useState([]);
+    const [predictionsLoading, setPredictionsLoading] = useState(false);
   
     const cookieTypes = Array.from(new Set(scatterData.map((d) => d.canonical_cookie_type)));
   
@@ -373,6 +374,7 @@ function NewTroopSearchPage({ onSearch, onBack }) {
       if (!suNumber || !predictedGirls || isNaN(predictedGirls)) return;
   
       const fetchSUPredictions = async () => {
+        setPredictionsLoading(true);
         try {
           const res = await fetch(`${API_BASE}/api/su_predict`, {
             method: "POST",
@@ -386,6 +388,8 @@ function NewTroopSearchPage({ onSearch, onBack }) {
           setSuPredictions(data);
         } catch (err) {
           console.error("Error fetching SU predictions:", err);
+        } finally {
+          setPredictionsLoading(false);
         }
       };
   
@@ -421,8 +425,10 @@ function NewTroopSearchPage({ onSearch, onBack }) {
             style={{ width: "80px" }}
           />
         </div>
-  
-        {suPredictions.length > 0 && (
+
+        {predictionsLoading && <p>Loading predictions...</p>}
+
+        {suPredictions.length > 0 && !predictionsLoading && (
           <div className="cookie-grid" style={{ background: "none", padding: "20px" }}>
             <h2>Predicted Cookie Sales for {predictedGirls} Girls</h2>
             {suPredictions.map((pred, idx) => (
