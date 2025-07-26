@@ -16,11 +16,11 @@ import {
 } from "recharts";
 import "./index.css";
 
-const API_BASE =
-  process.env.REACT_APP_API_BASE ||
-  (window.location.hostname === "localhost"
-    ? "http://localhost:5000"
-    : "https://gsci-backend.onrender.com");
+// Base URL for backend API
+// 1. Allows override via environment variable during local development or different deployments.
+// 2. Defaults to the Render deployment so the site works when hosted.
+const API_BASE = process.env.REACT_APP_API_BASE || "https://gsci-backend.onrender.com"; //"http://localhost:5000";
+
 
 /** Helper: convert period integer (e.g., 1, 2, 3...) to actual year (2019 + period) */
 function periodToYear(period) {
@@ -465,7 +465,7 @@ function NewTroopSearchPage({ onSearch, onBack }) {
                       </div>
                       {pred.predicted_cases == null && (
                         <div className="no-data" style={{ fontSize: "14px", color: "#f0ad4e" }}>
-                          Not enough data for prediction
+                          No historical data available
                         </div>
                       )}
                     </div>
@@ -494,7 +494,6 @@ function NewTroopSearchPage({ onSearch, onBack }) {
                   <XAxis dataKey="period" tickFormatter={periodToYear} />
                   <YAxis />
                   <Tooltip />
-                  <Legend />
                   <Line type="monotone" dataKey="avgGirls" stroke="#8884d8" strokeWidth={3} />
                 </LineChart>
               </ResponsiveContainer>
@@ -508,7 +507,6 @@ function NewTroopSearchPage({ onSearch, onBack }) {
                   <XAxis dataKey="period" tickFormatter={periodToYear} />
                   <YAxis />
                   <Tooltip />
-                  <Legend />
                   <Bar dataKey="avgSales" fill="#82ca9d" />
                 </BarChart>
               </ResponsiveContainer>
@@ -860,7 +858,7 @@ function NewTroopSearchPage({ onSearch, onBack }) {
                     </div>
                     {pred.predictedCases == null && (
                       <div className="no-data" style={{ fontSize: "14px", color: "#f0ad4e" }}>
-                        Not enough data for prediction
+                        No historical data available
                       </div>
                     )}
                   </div>
@@ -887,7 +885,6 @@ function NewTroopSearchPage({ onSearch, onBack }) {
                 <XAxis dataKey="period" tickFormatter={periodToYear} />
                 <YAxis />
                 <Tooltip />
-                <Legend />
                 <Line type="monotone" dataKey="totalSales" stroke="#8884d8" strokeWidth={3} />
               </LineChart>
             </ResponsiveContainer>
@@ -901,7 +898,6 @@ function NewTroopSearchPage({ onSearch, onBack }) {
                 <XAxis dataKey="period" tickFormatter={periodToYear} />
                 <YAxis />
                 <Tooltip />
-                <Legend />
                 <Bar dataKey="numberOfGirls" fill="#82ca9d" />
               </BarChart>
             </ResponsiveContainer>
@@ -928,7 +924,6 @@ function NewTroopSearchPage({ onSearch, onBack }) {
                     <XAxis dataKey="period" tickFormatter={periodToYear} />
                     <YAxis />
                     <Tooltip />
-                    <Legend />
                     <Line type="monotone" dataKey="sales" stroke={getColor(idx)} strokeWidth={3} />
                   </LineChart>
                 </ResponsiveContainer>
