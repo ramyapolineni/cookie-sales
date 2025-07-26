@@ -28,9 +28,9 @@ def load_and_clean_participation(file_path):
 # === LOAD + CLEAN TROOP SALES FILE ===
 # === COOKIE TYPE NORMALIZATION ===
 def get_canonical_cookie_lookup():
-    db_url = os.getenv("RENDER_DATABASE_URL") or os.getenv("DATABASE_URL")
+    db_url = os.getenv("DATABASE_URL")
     if not db_url:
-        raise ValueError("RENDER_DATABASE_URL or DATABASE_URL not set in environment variables")
+        raise ValueError("DATABASE_URL not set in environment variables")
     engine = create_engine(db_url)
     active_cookies_df = pd.read_sql_table("active_cookies", con=engine)
     canonical_names = active_cookies_df.iloc[:, 0].dropna().unique()  # assumes first column is the name
