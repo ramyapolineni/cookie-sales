@@ -19,14 +19,16 @@ body {
   z-index: -2;
 }
 
+/* Make the semi-opaque overlay span the full page height on every screen */
 .overlay {
-  position: absolute;
+  position: fixed;   /* stay glued to viewport and scroll with it */
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
   background: rgba(0, 0, 0, 0.5);
-  z-index: -1;
+  z-index: -1;       /* above the background image but below page content */
+  pointer-events: none; /* ensure it doesn’t block clicks */
 }
 
 .header {
@@ -126,10 +128,11 @@ body {
   font-size: 18px;
   cursor: pointer;
   border-radius: 5px;
+  min-width: 190px; 
 }
 
 .predict-button:hover {
-  background: #800080;
+  background: rgb(119, 0, 119);
 }
 
 /* Updated Predictions and Analytics Titles */
