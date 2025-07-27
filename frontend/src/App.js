@@ -19,8 +19,7 @@ import "./index.css";
 // Base URL for backend API
 // 1. Allows override via environment variable during local development or different deployments.
 // 2. Defaults to the Render deployment so the site works when hosted.
-const API_BASE = process.env.REACT_APP_API_BASE || "https://gsci-backend.onrender.com"; //"http://localhost:5000";
-
+const API_BASE = process.env.REACT_APP_API_BASE || "https://gsci-backend.onrender.com"; //"http://localhost:5000"; 
 
 /** Helper: convert period integer (e.g., 1, 2, 3...) to actual year (2019 + period) */
 function periodToYear(period) {
@@ -237,6 +236,7 @@ function getTrendline(data, xKey, yKey) {
    ------------------------------------------------------------------ */
 function NewTroopSearchPage({ onSearch, onBack }) {
   const [suInput, setSuInput] = useState("");
+  const [numGirls, setNumGirls] = useState("");
   const [error, setError] = useState("");
   const [suggestions, setSuggestions] = useState([]);
 
@@ -263,6 +263,10 @@ function NewTroopSearchPage({ onSearch, onBack }) {
       setError("Please enter a valid SU number (digits only).");
       return;
     }
+    if (!numGirls || isNaN(numGirls)) {
+      setError("Please enter a valid number of girls.");
+      return;
+    }
     setError("");
     try {
       const res = await fetch(`${API_BASE}/api/su_search?q=${suInput}`);
@@ -283,7 +287,7 @@ function NewTroopSearchPage({ onSearch, onBack }) {
           ? current
           : prev;
       });
-      onSearch(bestMatch["SU_Num"], bestMatch["SU_Name"]);
+      onSearch(bestMatch["SU_Num"], bestMatch["SU_Name"], numGirls);
     } catch (err) {
       console.error("Error fetching SU info:", err);
       setError("An error occurred while searching. Please try again.");
@@ -303,7 +307,7 @@ function NewTroopSearchPage({ onSearch, onBack }) {
         <button className="manual" onClick={onBack}>Back</button>
       </header>
       <h1 className="title">New Troop SU Search</h1>
-      <p className="subtitle">Enter your SU number and click "Search"</p>
+      <p className="subtitle">Enter your SU number and Number of Girls</p>
       <div className="input-container">
         <div className="input-box">
           SU Num:{" "}
@@ -312,6 +316,15 @@ function NewTroopSearchPage({ onSearch, onBack }) {
             value={suInput}
             onChange={(e) => setSuInput(e.target.value)}
             placeholder="e.g. 153"
+          />
+        </div>
+        <div className="input-box">
+          Number of Girls:{" "}
+          <input
+            type="text"
+            value={numGirls}
+            onChange={(e) => setNumGirls(e.target.value)}
+            placeholder="e.g. 25"
           />
         </div>
         <button className="predict-button" onClick={handleSearch}>Search</button>
@@ -338,13 +351,13 @@ function NewTroopSearchPage({ onSearch, onBack }) {
      - Vertical highlighting (via ReferenceLine) in each scatter chart at that value.
      - Updated chart title for total average cases sold.
    ------------------------------------------------------------------ */
-   function NewTroopAnalyticsPage({ suNumber, suName, onBack }) {
+   function NewTroopAnalyticsPage({ suNumber, suName, initialNumGirls = "", onBack }) {
     const [girlsData, setGirlsData] = useState([]);
     const [salesData, setSalesData] = useState([]);
     const [scatterData, setScatterData] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
-    const [predictedGirls, setPredictedGirls] = useState("");
+    const [predictedGirls, setPredictedGirls] = useState(initialNumGirls);
     const [suPredictions, setSuPredictions] = useState([]);
     const [predictionsLoading, setPredictionsLoading] = useState(false);
   
@@ -392,12 +405,14 @@ function NewTroopSearchPage({ onSearch, onBack }) {
       }
     };
 
-    // Initial predictions fetch when suNumber is set and predictedGirls has a value
+    // Fetch initial predictions **once** when the SU loads and we have an initial girls value.
+    const initFetched = React.useRef(false);
     useEffect(() => {
-      if (suNumber && predictedGirls && !isNaN(predictedGirls)) {
+      if (!initFetched.current && suNumber && predictedGirls && !isNaN(predictedGirls)) {
         fetchSUPredictions(predictedGirls);
+        initFetched.current = true; // ensure we only run once for this SU load
       }
-    }, [suNumber]);
+    }, [suNumber, predictedGirls]);
 
     const handleUpdatePredictions = () => {
       if (predictedGirls && !isNaN(predictedGirls)) {
@@ -946,6 +961,7 @@ function NewTroopSearchPage({ onSearch, onBack }) {
     // For New Troop flow (unchanged)
     const [selectedSU, setSelectedSU] = useState(null);
     const [selectedSUName, setSelectedSUName] = useState("");
+    const [newTroopNumGirls, setNewTroopNumGirls] = useState("");
     // For Returning Troop flow:
     const [returningTroopId, setReturningTroopId] = useState("");
     const [returningNumGirls, setReturningNumGirls] = useState("");
@@ -964,9 +980,10 @@ function NewTroopSearchPage({ onSearch, onBack }) {
       return (
         <NewTroopSearchPage
           onBack={() => setPage("landing")}
-          onSearch={(suNumber, suName) => {
+          onSearch={(suNumber, suName, numGirls) => {
             setSelectedSU(suNumber);
             setSelectedSUName(suName);
+            setNewTroopNumGirls(numGirls);
             setPage("newTroopAnalytics");
           }}
         />
@@ -983,6 +1000,7 @@ function NewTroopSearchPage({ onSearch, onBack }) {
         <NewTroopAnalyticsPage
           suNumber={selectedSU}
           suName={selectedSUName}
+          initialNumGirls={newTroopNumGirls}
           onBack={() => setPage("newTroopSearch")}
         />
       );
