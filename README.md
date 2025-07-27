@@ -1,6 +1,6 @@
 # GS Cookies Sales Forecasting Platform
 
-Production-grade ML-powered platform for predicting cookie sales using historical data and troop demographics.
+Production-grade platform for predicting cookie sales with Machine Learning models using historical data.
 
 ---
 
