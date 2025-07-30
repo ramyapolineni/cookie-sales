@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { FaHome, FaInfoCircle, FaQuestionCircle, FaChevronDown } from "react-icons/fa";
 import {
   BarChart,
   Bar,
@@ -17,8 +18,6 @@ import {
 import "./index.css";
 
 // Base URL for backend API
-// 1. Allows override via environment variable during local development or different deployments.
-// 2. Defaults to the Render deployment so the site works when hosted.
 const API_BASE = process.env.REACT_APP_API_BASE || "https://gsci-backend.onrender.com"; //"http://localhost:5000"; 
 
 /** Helper: convert period integer (e.g., 1, 2, 3...) to actual year (2019 + period) */
@@ -81,12 +80,121 @@ function getTrendline(data, xKey, yKey) {
 /** Cookie info for the ReturningTroopPage predictions grid */
 // Remove the cookies array with name/image mapping
 
+/** Custom Dropdown Component that matches existing input styling */
+function CustomDropdown({ 
+  value, 
+  onChange, 
+  options, 
+  placeholder 
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const dropdownRef = useRef(null);
+
+  // Filter options based on search term - only show options that start with the search term
+  const filteredOptions = options.filter(option => 
+    option.toString().startsWith(searchTerm)
+  );
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+        setSearchTerm("");
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelect = (option) => {
+    onChange(option);
+    setIsOpen(false);
+    setSearchTerm("");
+  };
+
+  const toggleDropdown = () => {
+    setIsOpen(!isOpen);
+    if (!isOpen) {
+      setSearchTerm("");
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (searchTerm) {
+        // Check if there's an exact match
+        const exactMatch = options.find(option => 
+          option.toString() === searchTerm
+        );
+        if (exactMatch) {
+          handleSelect(exactMatch);
+        } else {
+          // No exact match found, keep dropdown open with "No results found"
+          setIsOpen(true);
+        }
+      } else {
+        setIsOpen(!isOpen);
+      }
+    }
+  };
+
+  return (
+    <div className="custom-dropdown" ref={dropdownRef}>
+      <input
+        type="text"
+        value={isOpen ? searchTerm : (value || "")}
+        onChange={(e) => {
+          setSearchTerm(e.target.value);
+          if (!isOpen) setIsOpen(true);
+        }}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+        onFocus={() => setIsOpen(true)}
+        onBlur={() => {
+          // Delay closing to allow for option selection
+          setTimeout(() => setIsOpen(false), 200);
+        }}
+      />
+      <FaChevronDown 
+        className={`dropdown-arrow ${isOpen ? 'rotated' : ''}`}
+        onClick={toggleDropdown}
+      />
+      
+      {isOpen && (
+        <div className="dropdown-options">
+          <div className="dropdown-options-container">
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map((option, index) => (
+                <div
+                  key={index}
+                  className="dropdown-option"
+                  onMouseDown={() => handleSelect(option)}
+                >
+                  {option}
+                </div>
+              ))
+            ) : (
+              <div className="dropdown-option no-results">
+                No results found
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 
 /* ------------------------------------------------------------------
    PAGE 1: LandingPage -> user picks "New Troop" or "Returning Troop"
    ------------------------------------------------------------------ */
-   function LandingPage({ onNewTroop, onReturningTroop, onManual}) {
+   function LandingPage({ onNewTroop, onReturningTroop, onManual, onAbout, onFaq, onHome }) {
     return (
       <div className="main-container">
         <div className="background"></div>
@@ -97,22 +205,24 @@ function getTrendline(data, xKey, yKey) {
             <img src={`${API_BASE}/static/KREN2.png`} alt="KREN2 Logo" style={{ height: '100px', marginRight: '20px' }} />
             <img src={`${API_BASE}/static/KREN.png`} alt="KREN Logo" style={{ height: '150px' }} />
           </div>
-          
-
-
+          <nav className="nav-links">
+            <div className="nav-link" onClick={onHome}><FaHome /></div>
+            <div className="nav-link" onClick={onAbout}><FaInfoCircle /></div>
+            <div className="nav-link" onClick={onFaq}><FaQuestionCircle /></div>
+          </nav>
         </header>
-        <h1 className="title">Cookie Forecasting Model</h1>
+        <h1 className="title">Sales Prediction Platform</h1>
         <p className="subtitle">Forecasting Sales, One Cookie at a Time</p>
         <div className="input-container">
           <p>Welcome! Are you a new or returning troop?</p>
-          <button className="predict-button" onClick={onNewTroop}>New Troop</button>
           <button className="predict-button" onClick={onReturningTroop}>Returning Troop</button>
+          <button className="predict-button" onClick={onNewTroop}>New Troop</button>
         </div>
       </div>
     );
   }
 
-  function ManualPage({ onBack }) {
+  function ManualPage({ onBack, onAbout, onFaq, onHome }) {
     const [isDetailsVisible, setIsDetailsVisible] = useState(false);
     const [lightMode, setLightMode] = useState(false);
   
@@ -137,7 +247,11 @@ function getTrendline(data, xKey, yKey) {
             <img src={`${API_BASE}/static/KREN2.png`} alt="KREN2 Logo" style={{ height: '100px', marginRight: '20px' }} />
             <img src={`${API_BASE}/static/KREN.png`} alt="KREN Logo" style={{ height: '150px' }} />
           </div>
-          <button className="manual" onClick={onBack}>Back</button>
+          <nav className="nav-links">
+            <div className="nav-link" onClick={onHome}><FaHome /></div>
+            <div className="nav-link" onClick={onAbout}><FaInfoCircle /></div>
+            <div className="nav-link" onClick={onFaq}><FaQuestionCircle /></div>
+          </nav>
         </header>
   
         <div className="title">Cookie Forecasting Manual</div>
@@ -234,29 +348,27 @@ function getTrendline(data, xKey, yKey) {
 /* ------------------------------------------------------------------
    PAGE 2: NewTroopSearchPage -> user enters SU # and sees suggestions (non-clickable)
    ------------------------------------------------------------------ */
-function NewTroopSearchPage({ onSearch, onBack }) {
+function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
   const [suInput, setSuInput] = useState("");
   const [numGirls, setNumGirls] = useState("");
   const [error, setError] = useState("");
-  const [suggestions, setSuggestions] = useState([]);
+  const [suOptions, setSuOptions] = useState([]);
 
-  // Fetch suggestions as the user types (only if input is digits)
+  // Fetch all SU options on mount
   useEffect(() => {
-    if (!/^\d+$/.test(suInput)) {
-      setSuggestions([]);
-      return;
-    }
-    const fetchSuggestions = async () => {
+    const fetchSUOptions = async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/su_search?q=${suInput}`);
+        const res = await fetch(`${API_BASE}/api/su_search?q=`);
         const data = await res.json();
-        setSuggestions(data);
+        // Convert to array of SU numbers for the dropdown
+        const suNumbers = data.map(item => item.SU_Num.toString());
+        setSuOptions(suNumbers);
       } catch (err) {
-        console.error("Error fetching suggestions:", err);
+        console.error("Error fetching SU options:", err);
       }
     };
-    fetchSuggestions();
-  }, [suInput]);
+    fetchSUOptions();
+  }, []);
 
   const handleSearch = async () => {
     if (!/^\d+$/.test(suInput)) {
@@ -267,6 +379,7 @@ function NewTroopSearchPage({ onSearch, onBack }) {
       setError("Please enter a valid number of girls.");
       return;
     }
+    const validatedGirls = Math.max(0, Math.min(250, Number(numGirls)));
     setError("");
     try {
       const res = await fetch(`${API_BASE}/api/su_search?q=${suInput}`);
@@ -287,7 +400,7 @@ function NewTroopSearchPage({ onSearch, onBack }) {
           ? current
           : prev;
       });
-      onSearch(bestMatch["SU_Num"], bestMatch["SU_Name"], numGirls);
+      onSearch(bestMatch["SU_Num"], bestMatch["SU_Name"], validatedGirls);
     } catch (err) {
       console.error("Error fetching SU info:", err);
       setError("An error occurred while searching. Please try again.");
@@ -304,41 +417,40 @@ function NewTroopSearchPage({ onSearch, onBack }) {
             <img src={`${API_BASE}/static/KREN2.png`} alt="KREN2 Logo" style={{ height: '100px', marginRight: '20px' }} />
             <img src={`${API_BASE}/static/KREN.png`} alt="KREN Logo" style={{ height: '150px' }} />
         </div>
-        <button className="manual" onClick={onBack}>Back</button>
+        <nav className="nav-links">
+          <div className="nav-link" onClick={onHome}><FaHome /></div>
+          <div className="nav-link" onClick={onAbout}><FaInfoCircle /></div>
+          <div className="nav-link" onClick={onFaq}><FaQuestionCircle /></div>
+        </nav>
       </header>
       <h1 className="title">New Troop SU Search</h1>
       <p className="subtitle">Enter your SU number and Number of Girls</p>
-      <div className="input-container">
-        <div className="input-box">
-          SU Num:{" "}
-          <input
-            type="text"
-            value={suInput}
-            onChange={(e) => setSuInput(e.target.value)}
-            placeholder="e.g. 153"
-          />
-        </div>
+             <div className="input-container">
+         <div className="input-box">
+           SU Num:{" "}
+           <CustomDropdown
+             value={suInput}
+             onChange={setSuInput}
+             options={suOptions}
+             placeholder="e.g. 153"
+           />
+         </div>
         <div className="input-box">
           Number of Girls:{" "}
           <input
-            type="text"
+            type="number"
+            max="250"
             value={numGirls}
             onChange={(e) => setNumGirls(e.target.value)}
             placeholder="e.g. 25"
           />
         </div>
-        <button className="predict-button" onClick={handleSearch}>Search</button>
-      </div>
-      {suggestions.length > 0 && (
-        <div style={{ marginTop: "10px", background: "#000", color: "#fff", padding: "10px", borderRadius: "8px" }}>
-          <strong>Suggestions:</strong>
-          <ul style={{ listStyle: "none", padding: 0 }}>
-            {suggestions.map((s, i) => (
-              <li key={i}>{s["SU_Num"]} - {s["SU_Name"]}</li>
-            ))}
-          </ul>
+        <div style={{ display: "flex", gap: "20px", marginTop: "20px" }}>
+          <button className="predict-button" onClick={onBack}>Back</button>
+          <button className="predict-button" onClick={handleSearch}>Search</button>
         </div>
-      )}
+      </div>
+      {/* Suggestions now rendered via datalist; removed legacy list */}
       {error && <p style={{ color: "red" }}>{error}</p>}
     </div>
   );
@@ -351,13 +463,13 @@ function NewTroopSearchPage({ onSearch, onBack }) {
      - Vertical highlighting (via ReferenceLine) in each scatter chart at that value.
      - Updated chart title for total average cases sold.
    ------------------------------------------------------------------ */
-   function NewTroopAnalyticsPage({ suNumber, suName, initialNumGirls = "", onBack }) {
+   function NewTroopAnalyticsPage({ suNumber, suName, initialNumGirls = "", onBack, onAbout, onFaq, onHome }) {
     const [girlsData, setGirlsData] = useState([]);
     const [salesData, setSalesData] = useState([]);
     const [scatterData, setScatterData] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
-    const [predictedGirls, setPredictedGirls] = useState(initialNumGirls);
+    const [predictedGirls, setPredictedGirls] = useState(Math.max(0, Math.min(250, initialNumGirls)));
     const [suPredictions, setSuPredictions] = useState([]);
     const [predictionsLoading, setPredictionsLoading] = useState(false);
   
@@ -416,7 +528,9 @@ function NewTroopSearchPage({ onSearch, onBack }) {
 
     const handleUpdatePredictions = () => {
       if (predictedGirls && !isNaN(predictedGirls)) {
-        fetchSUPredictions(predictedGirls);
+        const clamped = Math.max(0, Math.min(250, Number(predictedGirls)));
+        setPredictedGirls(clamped);
+        fetchSUPredictions(clamped);
       }
     };
   
@@ -430,7 +544,11 @@ function NewTroopSearchPage({ onSearch, onBack }) {
             <img src={`${API_BASE}/static/KREN2.png`} alt="KREN2 Logo" style={{ height: '100px', marginRight: '20px' }} />
             <img src={`${API_BASE}/static/KREN.png`} alt="KREN Logo" style={{ height: '150px' }} />
           </div>
-          <button className="manual" onClick={onBack}>Back</button>
+          <nav className="nav-links">
+            <div className="nav-link" onClick={onHome}><FaHome /></div>
+            <div className="nav-link" onClick={onAbout}><FaInfoCircle /></div>
+            <div className="nav-link" onClick={onFaq}><FaQuestionCircle /></div>
+          </nav>
         </header>
         <h1 className="title">SU Dashboard</h1>
         <p className="subtitle">
@@ -444,13 +562,21 @@ function NewTroopSearchPage({ onSearch, onBack }) {
           <input
             type="number"
             value={predictedGirls}
-            onChange={(e) => setPredictedGirls(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setPredictedGirls(val);
+            }}
             placeholder="Enter a number"
             style={{ width: "80px" }}
+            max="250"
+            min="0"
           />
-          <button className="predict-button" onClick={handleUpdatePredictions}>
-            Update Predictions
-          </button>
+          <div style={{ display: "flex", gap: "20px" }}>
+            <button className="predict-button" onClick={handleUpdatePredictions}>
+              Update Predictions
+            </button>
+            <button className="predict-button" onClick={onBack}>Back</button>
+          </div>
         </div>
 
         {/* Cookie Predictions Section */}
@@ -592,12 +718,11 @@ function NewTroopSearchPage({ onSearch, onBack }) {
    - User enters troop id and number of girls.
    - Provides suggestions for troop id (fetched from /api/troop_ids).
    ------------------------------------------------------------------ */
-   function ReturningTroopSearchPage({ onSearch, onBack }) {
+   function ReturningTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
     const [troopInput, setTroopInput] = useState("");
     const [numGirls, setNumGirls] = useState("");
     const [error, setError] = useState("");
     const [troopIds, setTroopIds] = useState([]);
-    const [suggestions, setSuggestions] = useState([]);
   
     // Fetch all troop ids on mount
     useEffect(() => {
@@ -613,18 +738,6 @@ function NewTroopSearchPage({ onSearch, onBack }) {
       fetchTroopIds();
     }, []);
   
-    // Filter suggestions as the user types
-    useEffect(() => {
-      if (!troopInput) {
-        setSuggestions([]);
-        return;
-      }
-      const filtered = troopIds.filter(id =>
-        id.toString().startsWith(troopInput)
-      );
-      setSuggestions(filtered);
-    }, [troopInput, troopIds]);
-  
     const handleSearch = () => {
       if (!/^\d+$/.test(troopInput)) {
         setError("Please enter a valid Troop ID (digits only).");
@@ -634,8 +747,9 @@ function NewTroopSearchPage({ onSearch, onBack }) {
         setError("Please enter a valid number of girls.");
         return;
       }
+      const validatedGirls = Math.max(0, Math.min(250, Number(numGirls)));
       setError("");
-      onSearch(troopInput, numGirls);
+      onSearch(troopInput, validatedGirls);
     };
   
     return (
@@ -648,41 +762,40 @@ function NewTroopSearchPage({ onSearch, onBack }) {
             <img src={`${API_BASE}/static/KREN2.png`} alt="KREN2 Logo" style={{ height: '100px', marginRight: '20px' }} />
             <img src={`${API_BASE}/static/KREN.png`} alt="KREN Logo" style={{ height: '150px' }} />
           </div>
-          <button className="manual" onClick={onBack}>Back</button>
+          <nav className="nav-links">
+            <div className="nav-link" onClick={onHome}><FaHome /></div>
+            <div className="nav-link" onClick={onAbout}><FaInfoCircle /></div>
+            <div className="nav-link" onClick={onFaq}><FaQuestionCircle /></div>
+          </nav>
         </header>
         <h1 className="title">Returning Troops</h1>
         <p className="subtitle">Enter your Troop ID and Number of Girls</p>
         <div className="input-container">
           <div className="input-box">
             Troop ID:{" "}
-            <input
-              type="text"
+            <CustomDropdown
               value={troopInput}
-              onChange={(e) => setTroopInput(e.target.value)}
+              onChange={setTroopInput}
+              options={troopIds}
               placeholder="e.g. 101"
             />
           </div>
           <div className="input-box">
             Number of Girls:{" "}
             <input
-              type="text"
+              type="number"
+              max="250"
               value={numGirls}
               onChange={(e) => setNumGirls(e.target.value)}
               placeholder="e.g. 25"
             />
           </div>
-          <button className="predict-button" onClick={handleSearch}>Search</button>
-        </div>
-        {suggestions.length > 0 && (
-          <div style={{ marginTop: "10px", background: "#000", color: "#fff", padding: "10px", borderRadius: "8px" }}>
-            <strong>Suggestions:</strong>
-            <ul style={{ listStyle: "none", padding: 0 }}>
-              {suggestions.map((id, i) => (
-                <li key={i}>{id}</li>
-              ))}
-            </ul>
+          <div style={{ display: "flex", gap: "20px", marginTop: "20px" }}>
+            <button className="predict-button" onClick={onBack}>Back</button>
+            <button className="predict-button" onClick={handleSearch}>Search</button>
           </div>
-        )}
+        </div>
+        {/* Suggestions handled via datalist; legacy list removed */}
         {error && <p style={{ color: "red" }}>{error}</p>}
       </div>
     );
@@ -693,7 +806,7 @@ function NewTroopSearchPage({ onSearch, onBack }) {
    - Displays analytics and predictions.
    - Also shows Troop ID and the associated SU info (returned from /api/history).
    ------------------------------------------------------------------ */
-   function ReturningTroopAnalyticsPage({ troopId, numGirls, onBack }) {
+   function ReturningTroopAnalyticsPage({ troopId, numGirls, onBack, onAbout, onFaq, onHome }) {
     const [girlsData, setGirlsData] = useState([]);
     const [salesData, setSalesData] = useState([]);
     const [cookieBreakdownData, setCookieBreakdownData] = useState([]);
@@ -705,7 +818,7 @@ function NewTroopSearchPage({ onSearch, onBack }) {
     // Associated SU info (returned by /api/history)
     const [suInfo, setSuInfo] = useState({ su: null, suName: null });
     // State for updating number of girls (prefilled with initial value)
-    const [updatedNumGirls, setUpdatedNumGirls] = useState(numGirls);
+    const [updatedNumGirls, setUpdatedNumGirls] = useState(Math.max(0, Math.min(250, numGirls)));
   
     // Debug: Log data whenever it changes
     useEffect(() => {
@@ -801,12 +914,18 @@ function NewTroopSearchPage({ onSearch, onBack }) {
     // Initial predictions fetch when troopId is set
     useEffect(() => {
       if (troopId) {
-        fetchPredictions(updatedNumGirls);
+        if (Number(updatedNumGirls) <= 250) {
+          fetchPredictions(updatedNumGirls);
+        } else {
+          alert("Number of girls cannot exceed 250.");
+        }
       }
     }, [troopId]);
   
     const handleUpdatePredictions = () => {
-      fetchPredictions(updatedNumGirls);
+      const clamped = Math.max(0, Math.min(250, Number(updatedNumGirls)));
+      setUpdatedNumGirls(clamped);
+      fetchPredictions(clamped);
     };
   
     return (
@@ -819,7 +938,11 @@ function NewTroopSearchPage({ onSearch, onBack }) {
             <img src={`${API_BASE}/static/KREN2.png`} alt="KREN2 Logo" style={{ height: '100px', marginRight: '20px' }} />
             <img src={`${API_BASE}/static/KREN.png`} alt="KREN Logo" style={{ height: '150px' }} />
           </div>
-          <button className="manual" onClick={onBack}>Back</button>
+          <nav className="nav-links">
+            <div className="nav-link" onClick={onHome}><FaHome /></div>
+            <div className="nav-link" onClick={onAbout}><FaInfoCircle /></div>
+            <div className="nav-link" onClick={onFaq}><FaQuestionCircle /></div>
+          </nav>
         </header>
         <h1 className="title">Troop Dashboard</h1>
         <p className="subtitle">
@@ -837,10 +960,15 @@ function NewTroopSearchPage({ onSearch, onBack }) {
             value={updatedNumGirls}
             onChange={(e) => setUpdatedNumGirls(e.target.value)}
             style={{ width: "80px" }}
+            max="250"
+            min="0"
           />
-          <button className="predict-button" onClick={handleUpdatePredictions}>
-            Update Predictions
-          </button>
+          <div style={{ display: "flex", gap: "20px" }}>
+            <button className="predict-button" onClick={handleUpdatePredictions}>
+              Update Predictions
+            </button>
+            <button className="predict-button" onClick={onBack}>Back</button>
+          </div>
         </div>
   
         {/* Predictions Section */}
@@ -953,6 +1081,77 @@ function NewTroopSearchPage({ onSearch, onBack }) {
   
   
 /* ------------------------------------------------------------------
+   ABOUT PAGE
+   ------------------------------------------------------------------ */
+function AboutPage({ onBack, onHome, onFaq }) {
+  return (
+    <div className="main-container">
+      <div className="background"></div>
+      <div className="overlay"></div>
+      <header className="header">
+        <div className="logo-row">
+          <img src={`${API_BASE}/static/GSC(2).png`} alt="GSCI Logo" style={{ height: '50px', marginRight: '20px' }} />
+          <img src={`${API_BASE}/static/KREN2.png`} alt="KREN2 Logo" style={{ height: '100px', marginRight: '20px' }} />
+          <img src={`${API_BASE}/static/KREN.png`} alt="KREN Logo" style={{ height: '150px' }} />
+        </div>
+        <nav className="nav-links">
+          <div className="nav-link" onClick={onHome}><FaHome /></div>
+          <div className="nav-link" onClick={onBack}><FaInfoCircle /></div>
+          <div className="nav-link" onClick={onFaq}><FaQuestionCircle /></div>
+        </nav>
+      </header>
+      <h1 className="title">About This Project</h1>
+      <div className="content" style={{ maxWidth: '800px', margin: '0 auto', textAlign: 'left' }}>
+        <p>
+          This application was built in collaboration with Girl Scouts of Central Indiana and Purdue University's
+          Krenicki Center for Business Analytics & Machine Learning to help troops better forecast cookie sales.
+        </p>
+        <h2>Frequently Asked Questions</h2>
+        <h3>What does this model do?</h3>
+        <p>It forecasts cookie sales for both new and returning troops, enabling smarter inventory decisions.</p>
+        <h3>How are the predictions generated?</h3>
+        <p>The backend uses a hybrid modelling pipeline that dynamically selects from several statistical and machine-learning methods based on historical accuracy.</p>
+        <h3>Who can I contact for support?</h3>
+        <p>For questions, please email analytics@gsci.org.</p>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------
+   FAQ PAGE
+   ------------------------------------------------------------------ */
+function FAQPage({ onBack, onHome, onAbout }) {
+  return (
+    <div className="main-container">
+      <div className="background"></div>
+      <div className="overlay"></div>
+      <header className="header">
+        <div className="logo-row">
+          <img src={`${API_BASE}/static/GSC(2).png`} alt="GSCI Logo" style={{ height: '50px', marginRight: '20px' }} />
+          <img src={`${API_BASE}/static/KREN2.png`} alt="KREN2 Logo" style={{ height: '100px', marginRight: '20px' }} />
+          <img src={`${API_BASE}/static/KREN.png`} alt="KREN Logo" style={{ height: '150px' }} />
+        </div>
+        <nav className="nav-links">
+          <div className="nav-link" onClick={onHome}><FaHome /></div>
+          <div className="nav-link" onClick={onAbout}><FaInfoCircle /></div>
+          <div className="nav-link" onClick={onBack}><FaQuestionCircle /></div>
+        </nav>
+      </header>
+      <h1 className="title">Frequently Asked Questions</h1>
+      <div className="content" style={{ maxWidth: '800px', margin: '0 auto', textAlign: 'left' }}>
+        <h3>How do I get predictions?</h3>
+        <p>Select either Returning Troop or New Troop from the home page and enter the requested information. The model will generate predictions instantly.</p>
+        <h3>Can I change the number of girls later?</h3>
+        <p>Yes! On your dashboard use the input field next to "Update Predictions" to try different scenarios.</p>
+        <h3>Why is there a 0–250 limit?</h3>
+        <p>The limit reflects realistic troop sizes and prevents accidental large inputs that could distort forecasts.</p>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------
    MAIN APP COMPONENT: Manages navigation between pages.
    ------------------------------------------------------------------ */
    function App() {
@@ -972,6 +1171,9 @@ function NewTroopSearchPage({ onSearch, onBack }) {
           onNewTroop={() => setPage("newTroopSearch")}
           onReturningTroop={() => setPage("returningTroopSearch")}
           onManual={() => setPage("manual")}
+          onAbout={() => setPage("about")}
+          onFaq={() => setPage("faq")}
+          onHome={() => setPage("landing")}
         />
       );
     }
@@ -986,12 +1188,15 @@ function NewTroopSearchPage({ onSearch, onBack }) {
             setNewTroopNumGirls(numGirls);
             setPage("newTroopAnalytics");
           }}
+          onAbout={() => setPage("about")}
+          onFaq={() => setPage("faq")}
+          onHome={() => setPage("landing")}
         />
       );
     }
 
     if (page === "manual") {
-      return <ManualPage onBack={() => setPage("landing")} />;
+      return <ManualPage onBack={() => setPage("landing")} onAbout={() => setPage("about")} onFaq={() => setPage("faq")} onHome={() => setPage("landing")} />;
     }
     
   
@@ -1002,6 +1207,9 @@ function NewTroopSearchPage({ onSearch, onBack }) {
           suName={selectedSUName}
           initialNumGirls={newTroopNumGirls}
           onBack={() => setPage("newTroopSearch")}
+          onAbout={() => setPage("about")}
+          onFaq={() => setPage("faq")}
+          onHome={() => setPage("landing")}
         />
       );
     }
@@ -1015,6 +1223,9 @@ function NewTroopSearchPage({ onSearch, onBack }) {
             setReturningNumGirls(numGirls);
             setPage("returningTroopAnalytics");
           }}
+          onAbout={() => setPage("about")}
+          onFaq={() => setPage("faq")}
+          onHome={() => setPage("landing")}
         />
       );
     }
@@ -1025,8 +1236,19 @@ function NewTroopSearchPage({ onSearch, onBack }) {
           troopId={returningTroopId}
           numGirls={returningNumGirls}
           onBack={() => setPage("returningTroopSearch")}
+          onAbout={() => setPage("about")}
+          onFaq={() => setPage("faq")}
+          onHome={() => setPage("landing")}
         />
       );
+    }
+
+    if (page === "about") {
+      return <AboutPage onBack={() => setPage("landing")} onHome={() => setPage("landing")} onFaq={() => setPage("faq")} />;
+    }
+
+    if (page === "faq") {
+      return <FAQPage onBack={() => setPage("landing")} onHome={() => setPage("landing")} onAbout={() => setPage("about")} />;
     }
   
     return null;

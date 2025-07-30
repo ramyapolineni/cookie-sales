@@ -944,6 +944,14 @@ def get_breakdown(troop_id):
 @app.route('/api/su_search')
 def su_search():
     query = request.args.get('q', '').strip()
+    
+    # If query is empty, return all unique SU numbers
+    if not query:
+        all_sus = df[['SU_Num', 'SU_Name']].drop_duplicates().sort_values('SU_Num')
+        results = all_sus.to_dict(orient='records')
+        return jsonify(results)
+    
+    # If query is not a digit, return empty array
     if not query.isdigit():
         return jsonify([])
 
