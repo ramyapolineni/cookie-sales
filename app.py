@@ -155,7 +155,18 @@ def predict_page():
 
 @app.route('/api/troop_ids')
 def get_troop_ids():
-    return jsonify(sorted(df['troop_id'].unique().tolist()))
+    # Filter out troop IDs that contain letters and ensure they are numeric
+    df_clean = df.copy()
+    df_clean['troop_id'] = df_clean['troop_id'].astype(str).str.strip()
+    # Only keep rows where troop_id contains only digits
+    df_clean = df_clean[df_clean['troop_id'].str.match(r'^\d+$')]
+    
+    # Get unique troop IDs and format them as 5-digit numbers with leading zeros
+    unique_troop_ids = df_clean['troop_id'].unique().tolist()
+    formatted_troop_ids = [f"{int(troop_id):05d}" for troop_id in unique_troop_ids]
+    
+    # Return sorted, formatted troop IDs
+    return jsonify(sorted(formatted_troop_ids))
 
 # In /api/predict, remove fallback to CSV as well
 # Replace the data loading logic in api_predict to use only the database
@@ -945,9 +956,15 @@ def get_breakdown(troop_id):
 def su_search():
     query = request.args.get('q', '').strip()
     
+    # Filter out SU numbers that contain letters and ensure they are numeric
+    df_clean = df.copy()
+    df_clean['SU_Num'] = df_clean['SU_Num'].astype(str).str.strip()
+    # Only keep rows where SU_Num contains only digits
+    df_clean = df_clean[df_clean['SU_Num'].str.match(r'^\d+$')]
+    
     # If query is empty, return all unique SU numbers
     if not query:
-        all_sus = df[['SU_Num', 'SU_Name']].drop_duplicates().sort_values('SU_Num')
+        all_sus = df_clean[['SU_Num', 'SU_Name']].drop_duplicates(subset=['SU_Num']).sort_values('SU_Num')
         results = all_sus.to_dict(orient='records')
         return jsonify(results)
     
@@ -955,10 +972,10 @@ def su_search():
     if not query.isdigit():
         return jsonify([])
 
-    matches = df[df['SU_Num'].astype(str).str.startswith(query)]
+    matches = df_clean[df_clean['SU_Num'].str.contains(query)]
     results = (
         matches[['SU_Num', 'SU_Name']]
-        .drop_duplicates()
+        .drop_duplicates(subset=['SU_Num'])
         .sort_values('SU_Num')
         .to_dict(orient='records')
     )

@@ -18,7 +18,7 @@ import {
 import "./index.css";
 
 // Base URL for backend API
-const API_BASE = process.env.REACT_APP_API_BASE || "https://gsci-backend.onrender.com"; //"http://localhost:5000"; 
+const API_BASE = process.env.REACT_APP_API_BASE || "https://gsci-backend.onrender.com"; //"http://localhost:5000";
 
 /** Helper: convert period integer (e.g., 1, 2, 3...) to actual year (2019 + period) */
 function periodToYear(period) {
@@ -91,9 +91,9 @@ function CustomDropdown({
   const [searchTerm, setSearchTerm] = useState("");
   const dropdownRef = useRef(null);
 
-  // Filter options based on search term - only show options that start with the search term
+  // Filter options based on search term - show options that contain the search term anywhere
   const filteredOptions = options.filter(option => 
-    option.toString().startsWith(searchTerm)
+    option.toString().includes(searchTerm)
   );
 
   // Close dropdown when clicking outside
@@ -126,14 +126,17 @@ function CustomDropdown({
     if (e.key === 'Enter') {
       e.preventDefault();
       if (searchTerm) {
-        // Check if there's an exact match
+        // Check if there's an exact match first
         const exactMatch = options.find(option => 
           option.toString() === searchTerm
         );
         if (exactMatch) {
           handleSelect(exactMatch);
+        } else if (filteredOptions.length > 0) {
+          // If no exact match but there are filtered options, select the top one
+          handleSelect(filteredOptions[0]);
         } else {
-          // No exact match found, keep dropdown open with "No results found"
+          // No exact match and no filtered options, keep dropdown open with "No results found"
           setIsOpen(true);
         }
       } else {
@@ -738,19 +741,21 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
       fetchTroopIds();
     }, []);
   
-    const handleSearch = () => {
-      if (!/^\d+$/.test(troopInput)) {
-        setError("Please enter a valid Troop ID (digits only).");
-        return;
-      }
-      if (!numGirls || isNaN(numGirls)) {
-        setError("Please enter a valid number of girls.");
-        return;
-      }
-      const validatedGirls = Math.max(0, Math.min(250, Number(numGirls)));
-      setError("");
-      onSearch(troopInput, validatedGirls);
-    };
+      const handleSearch = () => {
+    if (!/^\d{5}$/.test(troopInput)) {
+      setError("Please enter a valid 5-digit Troop ID.");
+      return;
+    }
+    if (!numGirls || isNaN(numGirls)) {
+      setError("Please enter a valid number of girls.");
+      return;
+    }
+    const validatedGirls = Math.max(0, Math.min(250, Number(numGirls)));
+    setError("");
+    // Convert 5-digit format back to original number for backend
+    const originalTroopId = parseInt(troopInput, 10).toString();
+    onSearch(originalTroopId, validatedGirls);
+  };
   
     return (
       <div className="main-container">
@@ -777,7 +782,7 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
               value={troopInput}
               onChange={setTroopInput}
               options={troopIds}
-              placeholder="e.g. 101"
+              placeholder="e.g. 00101"
             />
           </div>
           <div className="input-box">
