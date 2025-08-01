@@ -217,7 +217,7 @@ function CustomDropdown({
         <h1 className="title">Sales Prediction Platform</h1>
         <p className="subtitle">Forecasting Sales, One Cookie at a Time</p>
         <div className="input-container">
-          <p>Welcome! Are you a new or returning troop?</p>
+          <p>Welcome! Please select your troop type below.</p>
           <button className="predict-button" onClick={onReturningTroop}>Returning Troop</button>
           <button className="predict-button" onClick={onNewTroop}>New Troop</button>
         </div>
@@ -949,7 +949,7 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
             <div className="nav-link" onClick={onFaq}><FaQuestionCircle /></div>
           </nav>
         </header>
-        <h1 className="title">Troop Dashboard</h1>
+        <h1 className="title">Returning Troop Dashboard</h1>
         <p className="subtitle">
           Troop ID: {troopId}
           {suInfo.su && (

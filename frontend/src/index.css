@@ -274,7 +274,6 @@ body {
 .custom-dropdown {
   position: relative;
   display: inline-block;
-  margin-left: 10px;
 }
 
 .custom-dropdown input {
@@ -285,6 +284,9 @@ body {
   background: white;
   color: #333;
   padding-right: 25px;
+  margin-left: 10px; /* Match the input-box input margin */
+  box-sizing: border-box;
+  width: calc(100% - 10px); /* Account for the margin */
 }
 
 .custom-dropdown input:focus {
@@ -312,7 +314,7 @@ body {
 .dropdown-options {
   position: absolute;
   top: 100%;
-  left: 0;
+  left: 10px; /* Match the input margin-left */
   background: white;
   border: 1px solid #ccc;
   border-top: none;
@@ -321,8 +323,8 @@ body {
   z-index: 1000;
   max-height: 200px;
   overflow: hidden;
-  margin-top: 0; /* Remove the 2px margin to make it flush */
-  width: 100%; /* Match input width exactly */
+  margin-top: 0;
+  width: calc(100% - 10px); /* Match the input width */
   box-sizing: border-box;
 }
 
@@ -330,7 +332,10 @@ body {
   max-height: 200px;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: #8884d8 #f1f1f1;
+  scrollbar-color: purple #f1f1f1;
+  /* Ensure content doesn't shift when scrollbar appears */
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .dropdown-options-container::-webkit-scrollbar {
@@ -343,12 +348,12 @@ body {
 }
 
 .dropdown-options-container::-webkit-scrollbar-thumb {
-  background: #8a2be2; /* purple to match nav bar hover and button color */
+  background: purple; /* Match button color */
   border-radius: 4px;
 }
 
 .dropdown-options-container::-webkit-scrollbar-thumb:hover {
-  background: #6a1b9a; /* darker purple on hover */
+  background: rgb(119, 0, 119); /* Match button hover color */
 }
 
 .dropdown-option {
