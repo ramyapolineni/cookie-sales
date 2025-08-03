@@ -466,7 +466,7 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
      - Vertical highlighting (via ReferenceLine) in each scatter chart at that value.
      - Updated chart title for total average cases sold.
    ------------------------------------------------------------------ */
-   function NewTroopAnalyticsPage({ suNumber, suName, initialNumGirls = "", onBack, onAbout, onFaq, onHome }) {
+      function NewTroopAnalyticsPage({ suNumber, suName, initialNumGirls = "", onBack, onAbout, onFaq, onHome }) {
     const [girlsData, setGirlsData] = useState([]);
     const [salesData, setSalesData] = useState([]);
     const [scatterData, setScatterData] = useState([]);
@@ -475,9 +475,13 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
     const [predictedGirls, setPredictedGirls] = useState(Math.max(0, Math.min(250, initialNumGirls)));
     const [suPredictions, setSuPredictions] = useState([]);
     const [predictionsLoading, setPredictionsLoading] = useState(false);
-  
+         // State for percentage field
+    const [percentage, setPercentage] = useState("");
+    const [percentageError, setPercentageError] = useState("");
+    const [appliedPercentage, setAppliedPercentage] = useState(100); // State for the percentage applied to predictions
+    
     const cookieTypes = Array.from(new Set(scatterData.map((d) => d.canonical_cookie_type)));
-  
+
     useEffect(() => {
       const fetchHistory = async () => {
         if (!suNumber) return;
@@ -498,7 +502,7 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
       };
       fetchHistory();
     }, [suNumber]);
-  
+
     // Function to fetch SU predictions using a given number of girls
     const fetchSUPredictions = async (girlsVal) => {
       setPredictionsLoading(true);
@@ -534,7 +538,50 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
         const clamped = Math.max(0, Math.min(250, Number(predictedGirls)));
         setPredictedGirls(clamped);
         fetchSUPredictions(clamped);
+        
+        // Apply the percentage when button is clicked
+        if (percentage && !isNaN(parseFloat(percentage))) {
+          const percentageValue = parseFloat(percentage);
+          if (percentageValue >= 0 && percentageValue <= 100) {
+            setAppliedPercentage(percentageValue);
+          }
+        } else {
+          setAppliedPercentage(100); // Default to 100% if no valid percentage
+        }
       }
+    };
+
+    const handlePercentageChange = (e) => {
+      const value = e.target.value;
+      setPercentage(value);
+      
+      // Clear error when user starts typing
+      if (percentageError) {
+        setPercentageError("");
+      }
+      
+      // Validate percentage range
+      const numValue = parseFloat(value);
+      if (value !== "" && (isNaN(numValue) || numValue < 0 || numValue > 100)) {
+        setPercentageError("Please enter a value between 0-100");
+      } else {
+        setPercentageError("");
+      }
+    };
+
+    // Function to calculate adjusted predicted cases based on percentage
+    const getAdjustedPredictedCases = (originalCases) => {
+      if (!appliedPercentage || isNaN(appliedPercentage)) {
+        return originalCases;
+      }
+      
+      if (appliedPercentage < 0 || appliedPercentage > 100) {
+        return originalCases;
+      }
+      
+      // Convert percentage to multiplier (e.g., 50% = 0.5, 150% = 1.5)
+      const multiplier = appliedPercentage / 100;
+      return originalCases * multiplier;
     };
   
     return (
@@ -559,21 +606,41 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
         </p>
   
         <div className="input-container" style={{ marginBottom: "20px" }}>
-          <label style={{ marginRight: "10px" }}>
-            How many girls do you think will sell?
-          </label>
-          <input
-            type="number"
-            value={predictedGirls}
-            onChange={(e) => {
-              const val = e.target.value;
-              setPredictedGirls(val);
-            }}
-            placeholder="Enter a number"
-            style={{ width: "80px" }}
-            max="250"
-            min="0"
-          />
+          <div style={{ display: "flex", alignItems: "center", gap: "20px", marginBottom: "10px" }}>
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <label style={{ marginRight: "10px" }}>
+                How many girls do you think will sell?
+              </label>
+              <input
+                type="number"
+                value={predictedGirls}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setPredictedGirls(val);
+                }}
+                placeholder="Enter a number"
+                style={{ width: "80px" }}
+                max="250"
+                min="0"
+              />
+            </div>
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <label style={{ marginRight: "10px" }}>Percentage (%):</label>
+              <input
+                type="number"
+                value={percentage}
+                onChange={handlePercentageChange}
+                style={{ width: "80px" }}
+                placeholder="0-100"
+                step="0.1"
+              />
+            </div>
+          </div>
+          {percentageError && (
+            <div style={{ color: "red", fontSize: "14px", marginBottom: "10px" }}>
+              {percentageError}
+            </div>
+          )}
           <div style={{ display: "flex", gap: "20px" }}>
             <button className="predict-button" onClick={handleUpdatePredictions}>
               Update Predictions
@@ -599,7 +666,7 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
                       </div>
                       <div className="predicted" style={{ fontSize: "20px" }}>
                         <strong>Predicted Cases:</strong>{" "}
-                        {pred.predicted_cases ?? "--"}
+                        {pred.predicted_cases != null ? getAdjustedPredictedCases(pred.predicted_cases).toFixed(1) : "--"}
                       </div>
                       <div className="interval" style={{ fontSize: "20px" }}>
                         <strong>Interval:</strong>{" "}
@@ -811,7 +878,7 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
    - Displays analytics and predictions.
    - Also shows Troop ID and the associated SU info (returned from /api/history).
    ------------------------------------------------------------------ */
-   function ReturningTroopAnalyticsPage({ troopId, numGirls, onBack, onAbout, onFaq, onHome }) {
+      function ReturningTroopAnalyticsPage({ troopId, numGirls, onBack, onAbout, onFaq, onHome }) {
     const [girlsData, setGirlsData] = useState([]);
     const [salesData, setSalesData] = useState([]);
     const [cookieBreakdownData, setCookieBreakdownData] = useState([]);
@@ -824,6 +891,10 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
     const [suInfo, setSuInfo] = useState({ su: null, suName: null });
     // State for updating number of girls (prefilled with initial value)
     const [updatedNumGirls, setUpdatedNumGirls] = useState(Math.max(0, Math.min(250, numGirls)));
+    // State for percentage field
+    const [percentage, setPercentage] = useState("");
+    const [percentageError, setPercentageError] = useState("");
+    const [appliedPercentage, setAppliedPercentage] = useState(100); // State for the percentage applied to predictions
   
     // Debug: Log data whenever it changes
     useEffect(() => {
@@ -931,6 +1002,49 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
       const clamped = Math.max(0, Math.min(250, Number(updatedNumGirls)));
       setUpdatedNumGirls(clamped);
       fetchPredictions(clamped);
+      
+      // Apply the percentage when button is clicked
+      if (percentage && !isNaN(parseFloat(percentage))) {
+        const percentageValue = parseFloat(percentage);
+        if (percentageValue >= 0 && percentageValue <= 100) {
+          setAppliedPercentage(percentageValue);
+        }
+      } else {
+        setAppliedPercentage(100); // Default to 100% if no valid percentage
+      }
+    };
+  
+    const handlePercentageChange = (e) => {
+      const value = e.target.value;
+      setPercentage(value);
+      
+      // Clear error when user starts typing
+      if (percentageError) {
+        setPercentageError("");
+      }
+      
+      // Validate percentage range
+      const numValue = parseFloat(value);
+      if (value !== "" && (isNaN(numValue) || numValue < 0 || numValue > 100)) {
+        setPercentageError("Please enter a value between 0-100");
+      } else {
+        setPercentageError("");
+      }
+    };
+  
+    // Function to calculate adjusted predicted cases based on percentage
+    const getAdjustedPredictedCases = (originalCases) => {
+      if (!appliedPercentage || isNaN(appliedPercentage)) {
+        return originalCases;
+      }
+      
+      if (appliedPercentage < 0 || appliedPercentage > 100) {
+        return originalCases;
+      }
+      
+      // Convert percentage to multiplier (e.g., 50% = 0.5, 150% = 1.5)
+      const multiplier = appliedPercentage / 100;
+      return originalCases * multiplier;
     };
   
     return (
@@ -959,15 +1073,35 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
   
         {/* Input to update the number of girls */}
         <div className="input-container" style={{ marginBottom: "20px" }}>
-          <label style={{ marginRight: "10px" }}>Update Number of Girls:</label>
-          <input
-            type="number"
-            value={updatedNumGirls}
-            onChange={(e) => setUpdatedNumGirls(e.target.value)}
-            style={{ width: "80px" }}
-            max="250"
-            min="0"
-          />
+          <div style={{ display: "flex", alignItems: "center", gap: "20px", marginBottom: "10px" }}>
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <label style={{ marginRight: "10px" }}>Update Number of Girls:</label>
+              <input
+                type="number"
+                value={updatedNumGirls}
+                onChange={(e) => setUpdatedNumGirls(e.target.value)}
+                style={{ width: "80px" }}
+                max="250"
+                min="0"
+              />
+            </div>
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <label style={{ marginRight: "10px" }}>Percentage (%):</label>
+              <input
+                type="number"
+                value={percentage}
+                onChange={handlePercentageChange}
+                style={{ width: "80px" }}
+                placeholder="0-100"
+                step="0.1"
+              />
+            </div>
+          </div>
+          {percentageError && (
+            <div style={{ color: "red", fontSize: "14px", marginBottom: "10px" }}>
+              {percentageError}
+            </div>
+          )}
           <div style={{ display: "flex", gap: "20px" }}>
             <button className="predict-button" onClick={handleUpdatePredictions}>
               Update Predictions
@@ -993,7 +1127,7 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
                     <div className="predicted" style={{ fontSize: "20px" }}>
                       <strong>Predicted Cases:</strong>{" "}
                       <span>
-                        {pred.predictedCases != null ? pred.predictedCases.toFixed(1) : "--"}
+                        {pred.predictedCases != null ? getAdjustedPredictedCases(pred.predictedCases).toFixed(1) : "--"}
                       </span>
                     </div>
                     <div className="interval" style={{ fontSize: "20px" }}>
