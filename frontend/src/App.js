@@ -42,6 +42,19 @@ function getColor(idx) {
   return palette[idx % palette.length];
 }
 
+/** Helper: format tooltip values to 2 decimal places */
+function formatTooltipValue(value) {
+  if (typeof value === 'number') {
+    return value.toFixed(2);
+  }
+  return value;
+}
+
+/** Custom tooltip formatter for Recharts */
+function customTooltipFormatter(value, name, props) {
+  return [formatTooltipValue(value), name];
+}
+
 function getTrendline(data, xKey, yKey) {
   if (!data || data.length < 2) return [];
 
@@ -209,8 +222,8 @@ function CustomDropdown({
             <img src={`${API_BASE}/static/KREN.png`} alt="KREN Logo" style={{ height: '150px' }} />
           </div>
           <nav className="nav-links">
-            <div className="nav-link" onClick={onHome}><FaHome /></div>
             <div className="nav-link" onClick={onAbout}><FaInfoCircle /></div>
+            <div className="nav-link" onClick={onHome}><FaHome /></div>
             <div className="nav-link" onClick={onFaq}><FaQuestionCircle /></div>
           </nav>
         </header>
@@ -251,8 +264,8 @@ function CustomDropdown({
             <img src={`${API_BASE}/static/KREN.png`} alt="KREN Logo" style={{ height: '150px' }} />
           </div>
           <nav className="nav-links">
-            <div className="nav-link" onClick={onHome}><FaHome /></div>
             <div className="nav-link" onClick={onAbout}><FaInfoCircle /></div>
+            <div className="nav-link" onClick={onHome}><FaHome /></div>
             <div className="nav-link" onClick={onFaq}><FaQuestionCircle /></div>
           </nav>
         </header>
@@ -421,8 +434,8 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
             <img src={`${API_BASE}/static/KREN.png`} alt="KREN Logo" style={{ height: '150px' }} />
         </div>
         <nav className="nav-links">
-          <div className="nav-link" onClick={onHome}><FaHome /></div>
           <div className="nav-link" onClick={onAbout}><FaInfoCircle /></div>
+          <div className="nav-link" onClick={onHome}><FaHome /></div>
           <div className="nav-link" onClick={onFaq}><FaQuestionCircle /></div>
         </nav>
       </header>
@@ -476,9 +489,9 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
     const [suPredictions, setSuPredictions] = useState([]);
     const [predictionsLoading, setPredictionsLoading] = useState(false);
          // State for percentage field
-    const [percentage, setPercentage] = useState("");
+    const [percentage, setPercentage] = useState("50");
     const [percentageError, setPercentageError] = useState("");
-    const [appliedPercentage, setAppliedPercentage] = useState(100); // State for the percentage applied to predictions
+    const [appliedPercentage, setAppliedPercentage] = useState(50); // State for the percentage applied to predictions
     
     const cookieTypes = Array.from(new Set(scatterData.map((d) => d.canonical_cookie_type)));
 
@@ -546,7 +559,7 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
             setAppliedPercentage(percentageValue);
           }
         } else {
-          setAppliedPercentage(100); // Default to 100% if no valid percentage
+          setAppliedPercentage(50); // Default to 50% if no valid percentage
         }
       }
     };
@@ -595,8 +608,8 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
             <img src={`${API_BASE}/static/KREN.png`} alt="KREN Logo" style={{ height: '150px' }} />
           </div>
           <nav className="nav-links">
-            <div className="nav-link" onClick={onHome}><FaHome /></div>
             <div className="nav-link" onClick={onAbout}><FaInfoCircle /></div>
+            <div className="nav-link" onClick={onHome}><FaHome /></div>
             <div className="nav-link" onClick={onFaq}><FaQuestionCircle /></div>
           </nav>
         </header>
@@ -704,7 +717,7 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="period" tickFormatter={periodToYear} />
                   <YAxis />
-                  <Tooltip />
+                  <Tooltip formatter={customTooltipFormatter} />
                   <Line type="monotone" dataKey="avgGirls" stroke="#8884d8" strokeWidth={3} />
                 </LineChart>
               </ResponsiveContainer>
@@ -717,7 +730,7 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="period" tickFormatter={periodToYear} />
                   <YAxis />
-                  <Tooltip />
+                  <Tooltip formatter={customTooltipFormatter} />
                   <Bar dataKey="avgSales" fill="#82ca9d" />
                 </BarChart>
               </ResponsiveContainer>
@@ -743,7 +756,7 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis type="number" dataKey="number_of_girls" xAxisId="main" domain={["auto", "auto"]} />
                       <YAxis type="number" dataKey="number_cases_sold" yAxisId="main" domain={["auto", "auto"]} />
-                      <Tooltip />
+                      <Tooltip formatter={customTooltipFormatter} />
                       <Scatter data={filtered} fill={getColor(idx)} xAxisId="main" yAxisId="main" />
                       <Line
                         data={trendlineData}
@@ -835,8 +848,8 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
             <img src={`${API_BASE}/static/KREN.png`} alt="KREN Logo" style={{ height: '150px' }} />
           </div>
           <nav className="nav-links">
-            <div className="nav-link" onClick={onHome}><FaHome /></div>
             <div className="nav-link" onClick={onAbout}><FaInfoCircle /></div>
+            <div className="nav-link" onClick={onHome}><FaHome /></div>
             <div className="nav-link" onClick={onFaq}><FaQuestionCircle /></div>
           </nav>
         </header>
@@ -892,9 +905,9 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
     // State for updating number of girls (prefilled with initial value)
     const [updatedNumGirls, setUpdatedNumGirls] = useState(Math.max(0, Math.min(250, numGirls)));
     // State for percentage field
-    const [percentage, setPercentage] = useState("");
+    const [percentage, setPercentage] = useState("50");
     const [percentageError, setPercentageError] = useState("");
-    const [appliedPercentage, setAppliedPercentage] = useState(100); // State for the percentage applied to predictions
+    const [appliedPercentage, setAppliedPercentage] = useState(50); // State for the percentage applied to predictions
   
     // Debug: Log data whenever it changes
     useEffect(() => {
@@ -1058,8 +1071,8 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
             <img src={`${API_BASE}/static/KREN.png`} alt="KREN Logo" style={{ height: '150px' }} />
           </div>
           <nav className="nav-links">
-            <div className="nav-link" onClick={onHome}><FaHome /></div>
             <div className="nav-link" onClick={onAbout}><FaInfoCircle /></div>
+            <div className="nav-link" onClick={onHome}><FaHome /></div>
             <div className="nav-link" onClick={onFaq}><FaQuestionCircle /></div>
           </nav>
         </header>
@@ -1166,7 +1179,7 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="period" tickFormatter={periodToYear} />
                 <YAxis />
-                <Tooltip />
+                <Tooltip formatter={customTooltipFormatter} />
                 <Line type="monotone" dataKey="totalSales" stroke="#8884d8" strokeWidth={3} />
               </LineChart>
             </ResponsiveContainer>
@@ -1179,7 +1192,7 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="period" tickFormatter={periodToYear} />
                 <YAxis />
-                <Tooltip />
+                <Tooltip formatter={customTooltipFormatter} />
                 <Bar dataKey="numberOfGirls" fill="#82ca9d" />
               </BarChart>
             </ResponsiveContainer>
@@ -1205,7 +1218,7 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="period" tickFormatter={periodToYear} />
                     <YAxis />
-                    <Tooltip />
+                    <Tooltip formatter={customTooltipFormatter} />
                     <Line type="monotone" dataKey="sales" stroke={getColor(idx)} strokeWidth={3} />
                   </LineChart>
                 </ResponsiveContainer>
@@ -1234,24 +1247,206 @@ function AboutPage({ onBack, onHome, onFaq }) {
           <img src={`${API_BASE}/static/KREN.png`} alt="KREN Logo" style={{ height: '150px' }} />
         </div>
         <nav className="nav-links">
-          <div className="nav-link" onClick={onHome}><FaHome /></div>
           <div className="nav-link" onClick={onBack}><FaInfoCircle /></div>
+          <div className="nav-link" onClick={onHome}><FaHome /></div>
           <div className="nav-link" onClick={onFaq}><FaQuestionCircle /></div>
         </nav>
       </header>
-      <h1 className="title">About This Project</h1>
-      <div className="content" style={{ maxWidth: '800px', margin: '0 auto', textAlign: 'left' }}>
-        <p>
-          This application was built in collaboration with Girl Scouts of Central Indiana and Purdue University's
-          Krenicki Center for Business Analytics & Machine Learning to help troops better forecast cookie sales.
-        </p>
-        <h2>Frequently Asked Questions</h2>
-        <h3>What does this model do?</h3>
-        <p>It forecasts cookie sales for both new and returning troops, enabling smarter inventory decisions.</p>
-        <h3>How are the predictions generated?</h3>
-        <p>The backend uses a hybrid modelling pipeline that dynamically selects from several statistical and machine-learning methods based on historical accuracy.</p>
-        <h3>Who can I contact for support?</h3>
-        <p>For questions, please email analytics@gsci.org.</p>
+      <h1 className="title">About The Platform</h1>
+      <div className="content" style={{ 
+        maxWidth: '1200px', 
+        margin: '0 auto', 
+        textAlign: 'left',
+        color: 'white',
+        padding: '20px'
+      }}>
+        
+        <section style={{ 
+          marginBottom: '60px',
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          padding: '40px',
+          borderRadius: '12px',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+          border: '1px solid rgba(255, 255, 255, 0.1)'
+        }}>
+          <h2 style={{ 
+            color: 'white', 
+            borderBottom: '3px solid #8B5CF6', 
+            paddingBottom: '15px', 
+            marginBottom: '30px',
+            fontSize: '28px',
+            fontWeight: 'bold',
+            textShadow: '0 2px 4px rgba(0, 0, 0, 0.5)'
+          }}>
+            Project
+          </h2>
+          <div style={{ display: 'flex', gap: '40px', alignItems: 'center' }}>
+            <div style={{ flex: '1' }}>
+              <p style={{ lineHeight: '1.8', fontSize: '18px', marginBottom: '20px', textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)' }}>
+                Advanced machine learning platform that transforms cookie sales forecasting.
+              </p>
+              <div style={{ marginBottom: '20px' }}>
+                <strong style={{ color: '#8B5CF6' }}>ML Models:</strong>
+                <ul style={{ margin: '10px 0', paddingLeft: '20px', lineHeight: '1.6', fontSize: '16px', textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)' }}>
+                  <li>Ridge Regression with clustering algorithms</li>
+                  <li>Dynamic model selection for optimal accuracy</li>
+                  <li>Hybrid system combining multiple prediction methods</li>
+                </ul>
+              </div>
+              <div style={{ marginBottom: '20px' }}>
+                <strong style={{ color: '#8B5CF6' }}>Results:</strong>
+                <ul style={{ margin: '10px 0', paddingLeft: '20px', lineHeight: '1.6', fontSize: '16px', textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)' }}>
+                  <li>1.35 cases improvement per troop per cookie type</li>
+                  <li>181,000+ additional boxes sold across 1,400+ troops</li>
+                  <li>Real-time predictions with confidence intervals</li>
+                </ul>
+              </div>
+              <div style={{ marginBottom: '20px' }}>
+                <strong style={{ color: '#8B5CF6' }}>Features:</strong>
+                <ul style={{ margin: '10px 0', paddingLeft: '20px', lineHeight: '1.6', fontSize: '16px', textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)' }}>
+                  <li>Scenario modeling for different participation levels</li>
+                  <li>Comprehensive analytics dashboards</li>
+                  <li>Data-driven inventory and marketing decisions</li>
+                </ul>
+              </div>
+            </div>
+            <div style={{ flex: '0 0 400px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              <img 
+                src={`${API_BASE}/static/chemicalgsci.jpg`} 
+                alt="Machine Learning Project" 
+                style={{ 
+                  width: '100%', 
+                  height: '350px', 
+                  objectFit: 'cover',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)'
+                }}
+              />
+            </div>
+          </div>
+        </section>
+
+        <section style={{ 
+          marginBottom: '60px',
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          padding: '40px',
+          borderRadius: '12px',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+          border: '1px solid rgba(255, 255, 255, 0.1)'
+        }}>
+          <h2 style={{ 
+            color: 'white', 
+            borderBottom: '3px solid #8B5CF6', 
+            paddingBottom: '15px', 
+            marginBottom: '30px',
+            fontSize: '28px',
+            fontWeight: 'bold',
+            textShadow: '0 2px 4px rgba(0, 0, 0, 0.5)'
+          }}>
+            Girl Scouts of Central Indiana
+          </h2>
+          <div style={{ display: 'flex', gap: '40px', alignItems: 'center' }}>
+            <div style={{ flex: '0 0 400px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              <img 
+                src={`${API_BASE}/static/gsci_whitelogo.jpg`} 
+                alt="Girl Scouts of Central Indiana" 
+                style={{ 
+                  width: '100%', 
+                  height: '350px', 
+                  objectFit: 'cover',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)'
+                }}
+              />
+            </div>
+            <div style={{ flex: '1' }}>
+              <p style={{ lineHeight: '1.8', fontSize: '18px', marginBottom: '20px', textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)' }}>
+                Empowering girls across the region to develop leadership skills and make a positive impact.
+              </p>
+              <div style={{ marginBottom: '20px' }}>
+                <strong style={{ color: '#8B5CF6' }}>Cookie Program Benefits:</strong>
+                <ul style={{ margin: '10px 0', paddingLeft: '20px', lineHeight: '1.6', fontSize: '16px', textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)' }}>
+                  <li>Business skills: goal setting, money management, customer service</li>
+                  <li>Entrepreneurship and marketing strategy development</li>
+                  <li>SMART goal setting and progress tracking</li>
+                </ul>
+              </div>
+              <div style={{ marginBottom: '20px' }}>
+                <strong style={{ color: '#8B5CF6' }}>Educational Impact:</strong>
+                <ul style={{ margin: '10px 0', paddingLeft: '20px', lineHeight: '1.6', fontSize: '16px', textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)' }}>
+                  <li>Funds troop activities and community service projects</li>
+                  <li>Supports camping trips, STEM workshops, and badge activities</li>
+                  <li>Builds character and life skills through hands-on learning</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section style={{ 
+          marginBottom: '60px',
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          padding: '40px',
+          borderRadius: '12px',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+          border: '1px solid rgba(255, 255, 255, 0.1)'
+        }}>
+          <h2 style={{ 
+            color: 'white', 
+            borderBottom: '3px solid #8B5CF6', 
+            paddingBottom: '15px', 
+            marginBottom: '30px',
+            fontSize: '28px',
+            fontWeight: 'bold',
+            textShadow: '0 2px 4px rgba(0, 0, 0, 0.5)'
+          }}>
+            Krenicki Center for Business Analytics & Machine Learning
+          </h2>
+          <div style={{ display: 'flex', gap: '40px', alignItems: 'center' }}>
+            <div style={{ flex: '1' }}>
+              <p style={{ lineHeight: '1.8', fontSize: '18px', marginBottom: '20px', textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)' }}>
+                Leading hub for business analytics and machine learning research at Purdue University.
+              </p>
+              <div style={{ marginBottom: '20px' }}>
+                <strong style={{ color: '#8B5CF6' }}>Research Focus:</strong>
+                <ul style={{ margin: '10px 0', paddingLeft: '20px', lineHeight: '1.6', fontSize: '16px', textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)' }}>
+                  <li>Predictive analytics and optimization algorithms</li>
+                  <li>Machine learning applications across healthcare, finance, retail</li>
+                  <li>Data-driven approaches to complex business challenges</li>
+                </ul>
+              </div>
+              <div style={{ marginBottom: '20px' }}>
+                <strong style={{ color: '#8B5CF6' }}>Industry Partnerships:</strong>
+                <ul style={{ margin: '10px 0', paddingLeft: '20px', lineHeight: '1.6', fontSize: '16px', textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)' }}>
+                  <li>Collaboration with Fortune 500 companies and startups</li>
+                  <li>Real-world project experience for students</li>
+                  <li>Innovative solutions driving business value and social impact</li>
+                </ul>
+              </div>
+              <div style={{ marginBottom: '20px' }}>
+                <strong style={{ color: '#8B5CF6' }}>Student Programs:</strong>
+                <ul style={{ margin: '10px 0', paddingLeft: '20px', lineHeight: '1.6', fontSize: '16px', textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)' }}>
+                  <li>Specialized courses in business analytics and data science</li>
+                  <li>Capstone projects, hackathons, and research initiatives</li>
+                  <li>Career preparation in rapidly evolving analytics field</li>
+                </ul>
+              </div>
+            </div>
+            <div style={{ flex: '0 0 400px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              <img 
+                src={`${API_BASE}/static/gscicamp.png`} 
+                alt="Krenicki Center" 
+                style={{ 
+                  width: '100%', 
+                  height: '350px', 
+                  objectFit: 'cover',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)'
+                }}
+              />
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );
@@ -1261,6 +1456,35 @@ function AboutPage({ onBack, onHome, onFaq }) {
    FAQ PAGE
    ------------------------------------------------------------------ */
 function FAQPage({ onBack, onHome, onAbout }) {
+  const [openQuestion, setOpenQuestion] = useState(null);
+
+  const faqData = [
+    {
+      question: "How does the cookie prediction system work?",
+      answer: "Advanced machine learning models analyze historical sales data and troop participation to predict future cookie sales. The system automatically selects the most accurate prediction method for each troop-cookie combination."
+    },
+    {
+      question: "What's the difference between 'New Troop' and 'Returning Troop' predictions?",
+      answer: "Returning Troop predictions use the troop's own historical data. New Troop predictions use data from similar troops in the same Service Unit since no direct history exists."
+    },
+    {
+      question: "How accurate are the predictions?",
+      answer: "The model improves accuracy by 1.35 cases per troop per cookie type compared to traditional methods. Confidence intervals show the likely range of outcomes for better planning."
+    },
+    {
+      question: "Can I adjust predictions for different scenarios?",
+      answer: "Yes! Modify the number of girls participating and apply percentage adjustments to see how different factors affect predicted sales and plan for various participation levels."
+    },
+    {
+      question: "What should I do with these predictions?",
+      answer: "Use predictions for inventory ordering, setting realistic sales goals, and planning fundraising strategy. Analytics help identify trends and opportunities to improve performance."
+    }
+  ];
+
+  const toggleQuestion = (index) => {
+    setOpenQuestion(openQuestion === index ? null : index);
+  };
+
   return (
     <div className="main-container">
       <div className="background"></div>
@@ -1272,19 +1496,78 @@ function FAQPage({ onBack, onHome, onAbout }) {
           <img src={`${API_BASE}/static/KREN.png`} alt="KREN Logo" style={{ height: '150px' }} />
         </div>
         <nav className="nav-links">
-          <div className="nav-link" onClick={onHome}><FaHome /></div>
           <div className="nav-link" onClick={onAbout}><FaInfoCircle /></div>
+          <div className="nav-link" onClick={onHome}><FaHome /></div>
           <div className="nav-link" onClick={onBack}><FaQuestionCircle /></div>
         </nav>
       </header>
       <h1 className="title">Frequently Asked Questions</h1>
-      <div className="content" style={{ maxWidth: '800px', margin: '0 auto', textAlign: 'left' }}>
-        <h3>How do I get predictions?</h3>
-        <p>Select either Returning Troop or New Troop from the home page and enter the requested information. The model will generate predictions instantly.</p>
-        <h3>Can I change the number of girls later?</h3>
-        <p>Yes! On your dashboard use the input field next to "Update Predictions" to try different scenarios.</p>
-        <h3>Why is there a 0–250 limit?</h3>
-        <p>The limit reflects realistic troop sizes and prevents accidental large inputs that could distort forecasts.</p>
+      <div className="content" style={{ 
+        maxWidth: '900px', 
+        margin: '0 auto', 
+        textAlign: 'left',
+        color: 'white',
+        padding: '20px'
+      }}>
+        
+        <div style={{ 
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          padding: '40px',
+          borderRadius: '12px',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+          border: '1px solid rgba(255, 255, 255, 0.1)'
+        }}>
+          {faqData.map((faq, index) => (
+            <div key={index} style={{ marginBottom: index < faqData.length - 1 ? '20px' : '0' }}>
+              <button
+                onClick={() => toggleQuestion(index)}
+                style={{
+                  width: '100%',
+                  padding: '25px',
+                  backgroundColor: openQuestion === index ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                  color: 'white',
+                  border: openQuestion === index ? '2px solid #8B5CF6' : '1px solid rgba(255, 255, 255, 0.2)',
+                  borderRadius: '8px',
+                  textAlign: 'left',
+                  fontSize: '18px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)'
+                }}
+              >
+                {faq.question}
+                <FaChevronDown 
+                  style={{ 
+                    transform: openQuestion === index ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.3s ease',
+                    color: openQuestion === index ? '#8B5CF6' : 'white'
+                  }} 
+                />
+              </button>
+              
+              {openQuestion === index && (
+                <div style={{
+                  padding: '25px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                  border: '1px solid rgba(139, 92, 246, 0.3)',
+                  borderTop: 'none',
+                  borderRadius: '0 0 8px 8px',
+                  fontSize: '16px',
+                  lineHeight: '1.7',
+                  color: 'white',
+                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)',
+                  marginTop: '2px'
+                }}>
+                  {faq.answer}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -39,6 +39,7 @@ body {
   background: black;
   height: 120px; /* Consistent height */
   box-sizing: border-box;
+  position: relative;
 }
 
 /* Modern navbar links */
@@ -46,6 +47,9 @@ body {
   display: flex;
   gap: 30px;
   font-size: 26px;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .nav-link {
