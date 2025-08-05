@@ -3,10 +3,11 @@ import os
 import re
 from glob import glob
 from sqlalchemy import create_engine
+from typing import Dict, List, Any
 
 
 # === LOAD + CLEAN PARTICIPATION FILE ===
-def load_and_clean_participation(file_path):
+def load_and_clean_participation(file_path: str) -> pd.DataFrame:
     part_df = pd.read_excel(file_path, sheet_name='eBudde Report', skiprows=4)
     part_df.columns = [col.strip().replace('\n', ' ') if isinstance(col, str) else col for col in part_df.columns]
 
@@ -18,16 +19,24 @@ def load_and_clean_participation(file_path):
     })
 
     part_df = part_df[['SU_Name', 'SU_Num', 'troop_id', 'number_of_girls']].copy()
-    # Remove alphabetical characters from troop_id
-    part_df['troop_id'] = part_df['troop_id'].astype(str).str.replace(r'[A-Za-z]', '', regex=True).str.strip()
+    
+    # Clean SU_Num by removing "SU" prefix for files from 2025 onwards
+    year_from_filename = int(re.search(r'(\d{4})', file_path).group(1))
+    if year_from_filename >= 2025:
+        part_df['SU_Num'] = part_df['SU_Num'].astype(str).str.replace(r'^SU\s*', '', regex=True).str.strip()
+    
+    # Clean troop_id and format as 5-character string
+    part_df['troop_id'] = part_df['troop_id'].astype(str).str.strip()
+    # Format troop_id as 5-character string with leading spaces
+    part_df['troop_id'] = part_df['troop_id'].apply(lambda x: f"{x:>5}")
     # Drop rows where troop_id is empty after cleaning
-    part_df = part_df[part_df['troop_id'] != '']
+    part_df = part_df[part_df['troop_id'] != '     ']
     return part_df
 
 
 # === LOAD + CLEAN TROOP SALES FILE ===
 # === COOKIE TYPE NORMALIZATION ===
-def get_canonical_cookie_lookup():
+def get_canonical_cookie_lookup() -> Dict[str, str]:
     db_url = os.getenv("DATABASE_URL")
     if not db_url:
         raise ValueError("DATABASE_URL not set in environment variables")
@@ -42,7 +51,7 @@ def get_canonical_cookie_lookup():
         print(f"  Canonical: {repr(name)} | Cleaned: {repr(cleaned)}")
     return lookup
 
-def normalize_cookie_type_dynamic(name, canonical_lookup):
+def normalize_cookie_type_dynamic(name: str, canonical_lookup: Dict[str, str]) -> str:
     if pd.isnull(name):
         return name
     cleaned = re.sub(r'\s+|[-\'"`]', '', str(name).lower())
@@ -50,7 +59,7 @@ def normalize_cookie_type_dynamic(name, canonical_lookup):
     print(f"[DEBUG] Raw: {repr(name)} | Cleaned: {repr(cleaned)} | Normalized: {repr(result)}")
     return result
 
-def repair_split_cookie_columns(df, canonical_names):
+def repair_split_cookie_columns(df: pd.DataFrame, canonical_names: List[str]) -> pd.DataFrame:
     # Remove all whitespace and dashes for matching
     canonical_cleaned = {re.sub(r'\s+|[-\'"`]', '', name.lower()): name for name in canonical_names}
     new_columns = []
@@ -78,7 +87,7 @@ def repair_split_cookie_columns(df, canonical_names):
     df.columns = new_columns
     return df
 
-def load_and_clean_sales(file_path, year):
+def load_and_clean_sales(file_path: str, year: int) -> pd.DataFrame:
     sales_df = pd.read_excel(file_path, skiprows=4)
     # Dynamically fetch canonical names for header repair
     canonical_lookup = get_canonical_cookie_lookup()
@@ -91,6 +100,10 @@ def load_and_clean_sales(file_path, year):
         'Service Unit Number': 'SU_Num',
         'Troop': 'troop_id'
     })
+    
+    # Clean SU_Num by removing "SU" prefix for files from 2025 onwards
+    if year >= 2025:
+        sales_df['SU_Num'] = sales_df['SU_Num'].astype(str).str.replace(r'^SU\s*', '', regex=True).str.strip()
 
     id_cols = ['troop_id', 'SU_Name', 'SU_Num']
     cookie_cols = [col for col in sales_df.columns if col not in id_cols and "Total" not in col]
@@ -102,10 +115,12 @@ def load_and_clean_sales(file_path, year):
         value_name='number_of_cookies_sold'
     )
 
-    # Remove alphabetical characters from troop_id
-    melted['troop_id'] = melted['troop_id'].astype(str).str.replace(r'[A-Za-z]', '', regex=True).str.strip()
+    # Clean troop_id and format as 5-character string
+    melted['troop_id'] = melted['troop_id'].astype(str).str.strip()
+    # Format troop_id as 5-character string with leading spaces
+    melted['troop_id'] = melted['troop_id'].apply(lambda x: f"{x:>5}")
     # Drop rows where troop_id is empty after cleaning
-    melted = melted[melted['troop_id'] != '']
+    melted = melted[melted['troop_id'] != '     ']
 
     print("\n[DEBUG] Sample normalization results:")
     sample = melted['cookie_type'].dropna().unique()[:10]
@@ -129,7 +144,7 @@ def load_and_clean_sales(file_path, year):
 
 
 # === MERGE SALES + PARTICIPATION FILES ===
-def merge_with_participation(melted_df, part_df):
+def merge_with_participation(melted_df: pd.DataFrame, part_df: pd.DataFrame) -> pd.DataFrame:
     # Drop SU_Name and SU_Num from sales file before merge to avoid duplication
     melted_df = melted_df.drop(columns=['SU_Name', 'SU_Num'], errors='ignore')
 
@@ -139,7 +154,7 @@ def merge_with_participation(melted_df, part_df):
     return merged
 
 # === SAVE FINAL FILE ===
-def save_final(df, year):
+def save_final(df: pd.DataFrame, year: int) -> pd.DataFrame:
     df['period'] = year - 2019  # 2020 = period 1
 
     final_df = df.rename(columns={

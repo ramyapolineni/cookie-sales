@@ -3,10 +3,11 @@ import os
 from sqlalchemy import create_engine
 from gspread import service_account
 import gspread_dataframe as gd
+from typing import Any
 
 MAX_SHARE_COOKIES = 5  # Set how many 'share-from' columns you want to support
 
-def fetch_and_upload_cookie_mapping():
+def fetch_and_upload_cookie_mapping() -> None:
     # Authenticate with Google Sheets
     gc = service_account(filename="service_account.json")
     spreadsheet = gc.open("cookie_mapping")

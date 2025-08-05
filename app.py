@@ -15,6 +15,7 @@ from scipy.stats import linregress
 import os
 from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
+from typing import Any, List, Dict, Optional
 
 load_dotenv()
 warnings.simplefilter("ignore", category=RuntimeWarning)
@@ -25,7 +26,7 @@ CORS(app, resources={r"/api/*": {"origins": ["http://localhost:3000", "https://g
 # -------------------------------
 # DATABASE CONNECTION
 # -------------------------------
-def get_database_connection():
+def get_database_connection() -> Any:
     """Create database connection using environment variable"""
     database_url = os.getenv('DATABASE_URL')
     if database_url:
@@ -35,7 +36,7 @@ def get_database_connection():
     else:
         raise Exception("DATABASE_URL not found. Please set it in your environment.")
 
-def load_data_from_database():
+def load_data_from_database() -> pd.DataFrame:
     """Load data from PostgreSQL database"""
     engine = get_database_connection()
     try:
@@ -63,6 +64,8 @@ if df is None:
 
 # DO NOT force troop_id to int, always treat as string
 # df['troop_id'] = df['troop_id'].astype(int)
+# Ensure troop_id is formatted as 5-character string
+df['troop_id'] = df['troop_id'].astype(str).str.strip().apply(lambda x: f"{x:>5}")
 df['period'] = df['period'].astype(int)
 df['number_of_girls'] = df['number_of_girls'].astype(float)
 df['number_cases_sold'] = df['number_cases_sold'].astype(float)
@@ -81,7 +84,7 @@ normalized_to_canonical = {
     'lemonups': 'Lemon-Ups'
 }
 
-def normalize_cookie_type(raw_name):
+def normalize_cookie_type(raw_name: str) -> str:
     raw_lower = raw_name.strip().lower()
     slug = re.sub(r'[^a-z0-9]+', '', raw_lower)
     return normalized_to_canonical.get(slug, raw_name)
@@ -96,7 +99,7 @@ df = df.merge(stats, on=['troop_id', 'canonical_cookie_type'], how='left')
 # -------------------------------
 # TRAIN RIDGE TO GET RMSE FOR INTERVAL WIDTH
 # -------------------------------
-def run_ridge_interval_analysis():
+def run_ridge_interval_analysis() -> None:
     groups = df.groupby(['troop_id', 'canonical_cookie_type'])
     y_train_all, y_pred_all = [], []
 
@@ -155,15 +158,13 @@ def predict_page():
 
 @app.route('/api/troop_ids')
 def get_troop_ids():
-    # Filter out troop IDs that contain letters and ensure they are numeric
+    # Get all unique troop IDs and format them as 5-character strings
     df_clean = df.copy()
     df_clean['troop_id'] = df_clean['troop_id'].astype(str).str.strip()
-    # Only keep rows where troop_id contains only digits
-    df_clean = df_clean[df_clean['troop_id'].str.match(r'^\d+$')]
     
-    # Get unique troop IDs and format them as 5-digit numbers with leading zeros
+    # Get unique troop IDs and format them as 5-character strings with leading spaces
     unique_troop_ids = df_clean['troop_id'].unique().tolist()
-    formatted_troop_ids = [f"{int(troop_id):05d}" for troop_id in unique_troop_ids]
+    formatted_troop_ids = [f"{troop_id:>5}" for troop_id in unique_troop_ids]
     
     # Return sorted, formatted troop IDs
     return jsonify(sorted(formatted_troop_ids))
@@ -202,6 +203,8 @@ def api_predict():
         }, inplace=True)
         df_new['year'] = df_new['year'].astype(int)
         df_new['troop_id'] = df_new['troop_id'].astype(str).str.strip()
+        # Ensure troop_id is formatted as 5-character string
+        df_new['troop_id'] = df_new['troop_id'].apply(lambda x: f"{x:>5}")
         df_new['cookie_type'] = df_new['cookie_type'].str.strip().str.lower()
         # Normalize cookie_type for all downstream logic
         df_new['normalized_cookie_type'] = df_new['cookie_type'].apply(normalize_cookie_type)
@@ -462,44 +465,42 @@ def api_predict():
                     "image_url": url_for('static', filename=cookie_image_map.get(cookie, "default.png"), _external=True),
                     "source": "fallback"
                 })
-        # Compute the prediction interval for each final prediction using a chain:
-        # 1. Use candidate-based standard error (sqrt(candidate_mse)).
-        # 2. Else, use the cluster data's standard deviation.
-        # 3. Else, use the SU-level standard deviation.
-        # 4. Otherwise, fallback to overall RMSE.
+        # Create final predictions without intervals and add last year based predictions
         final_predictions = []
         for pred in all_predictions:
             cookie = pred["cookie_type"]
             predicted_val = float(pred["predicted"])
-            candidate_mse = pred.get("candidate_mse", None)
-            cluster_std = pred.get("cluster_std", None)
-            su_val = pred.get("su", None)
-            if candidate_mse is not None and candidate_mse > 0:
-                candidate_std = np.sqrt(candidate_mse)
-                interval_width = 1.96 * candidate_std
-            elif cluster_std is not None and not np.isnan(cluster_std):
-                interval_width = 1.96 * cluster_std
+            
+            # Get last year sales for this cookie type
+            last_year_sales = None
+            last_year_girls = None
+            if pred.get("actual") is not None:
+                last_year_sales = pred["actual"]
+                # Get last year girls count from test data
+                test_cookie_data = test[test['normalized_cookie_type'] == cookie]
+                if not test_cookie_data.empty:
+                    last_year_girls = test_cookie_data.iloc[0]['num_girls']
             else:
-                if su_val is not None:
-                    su_data_all = df_new[(df_new['SU_Num'] == su_val) & (df_new['normalized_cookie_type'] == cookie)]
-                    su_std = su_data_all['cases_sold'].std()
-                else:
-                    su_std = None
-                if su_std is not None and not np.isnan(su_std):
-                    interval_width = 1.96 * su_std
-                else:
-                    if preds_for_rmse:
-                        overall_rmse = np.sqrt(mean_squared_error(preds_for_rmse, preds_for_rmse))
-                        interval_width = overall_rmse * 2 if overall_rmse > 0 else 10
-                    else:
-                        interval_width = 10
+                # Try to get from test data
+                test_cookie_data = test[test['normalized_cookie_type'] == cookie]
+                if not test_cookie_data.empty:
+                    last_year_sales = test_cookie_data.iloc[0]['cases_sold']
+                    last_year_girls = test_cookie_data.iloc[0]['num_girls']
+            
+            # Calculate last year based prediction
+            last_year_based_prediction = None
+            if last_year_sales is not None and last_year_girls is not None and last_year_girls > 0:
+                # Scale last year's sales based on the ratio of girls
+                girls_ratio = input_num_girls / last_year_girls
+                last_year_based_prediction = last_year_sales * girls_ratio
+            
             # Always set image_url using normalized cookie type
             image_url = url_for('static', filename=cookie_image_map.get(cookie, "default.png"), _external=True)
             final_predictions.append({
                 "cookie_type": cookie,
                 "predicted_cases": round(predicted_val, 2),
-                "interval_lower": round(max(1, predicted_val - interval_width), 2),
-                "interval_upper": round(predicted_val + interval_width, 2),
+                "last_year_sales": round(last_year_sales, 2) if last_year_sales is not None else None,
+                "last_year_based_prediction": round(last_year_based_prediction, 2) if last_year_based_prediction is not None else None,
                 "image_url": image_url,
                 "source": "model"
             })
@@ -817,8 +818,8 @@ def api_predict():
                 final_predictions.append({
                     "cookie_type": rc,
                     "predicted_cases": round(pred_val, 2),
-                    "interval_lower": round(max(1, pred_val - 10), 2),  # Default interval width
-                    "interval_upper": round(pred_val + 10, 2),
+                    "last_year_sales": None,  # No historical data for replaced cookies
+                    "last_year_based_prediction": None,  # No historical data for replaced cookies
                     "image_url": url_for('static', filename=cookie_image_map.get(rc, "default.png"), _external=True),
                     "source": "fallback"
                 })
@@ -862,8 +863,8 @@ def api_predict():
                 final_predictions.append({
                     "cookie_type": cookie,
                     "predicted_cases": round(value, 2),
-                    "interval_lower": round(max(1, value - 10), 2),  # Default interval
-                    "interval_upper": round(value + 10, 2),
+                    "last_year_sales": None,  # No historical data for new cookies
+                    "last_year_based_prediction": None,  # No historical data for new cookies
                     "image_url": url_for('static', filename=cookie_image_map.get(cookie, "default.png"), _external=True),
                     "source": "fallback"
                 })
@@ -888,8 +889,8 @@ def api_predict():
                 filtered_predictions.append({
                     "cookie_type": cookie,
                     "predicted_cases": None,
-                    "interval_lower": None,
-                    "interval_upper": None,
+                    "last_year_sales": None,
+                    "last_year_based_prediction": None,
                     "image_url": url_for('static', filename=cookie_image_map.get(cookie, "default.png"), _external=True),
                     "source": "missing"
                 })
@@ -906,12 +907,12 @@ def api_predict():
 
 
 # In app.py, modify /api/history endpoint:
-@app.route('/api/history/<int:troop_id>')
-def get_history(troop_id):
+@app.route('/api/history/<string:troop_id>')
+def get_history(troop_id: str):
     print(f"[DEBUG] /api/history called with troop_id={troop_id}")
     print(f"[DEBUG] troop_id dtype in df: {df['troop_id'].dtype}")
     print(f"[DEBUG] Sample troop_id values: {df['troop_id'].head(5).tolist()}")
-    troop_df = df[df['troop_id'].astype(str) == str(troop_id)]
+    troop_df = df[df['troop_id'].astype(str) == troop_id]
     print(f"[DEBUG] Rows found for troop_id {troop_id}: {len(troop_df)}")
     if troop_df.empty:
         print(f"[DEBUG] No data found for troop_id {troop_id}")
@@ -934,12 +935,12 @@ def get_history(troop_id):
     })
 
 
-@app.route('/api/cookie_breakdown/<int:troop_id>')
-def get_breakdown(troop_id):
+@app.route('/api/cookie_breakdown/<string:troop_id>')
+def get_breakdown(troop_id: str):
     print(f"[DEBUG] /api/cookie_breakdown called with troop_id={troop_id}")
     print(f"[DEBUG] troop_id dtype in df: {df['troop_id'].dtype}")
     print(f"[DEBUG] Sample troop_id values: {df['troop_id'].head(5).tolist()}")
-    troop_df = df[df['troop_id'].astype(str) == str(troop_id)]
+    troop_df = df[df['troop_id'].astype(str) == troop_id]
     print(f"[DEBUG] Rows found for troop_id {troop_id}: {len(troop_df)}")
     if troop_df.empty:
         print(f"[DEBUG] No data found for troop_id {troop_id}")
@@ -987,6 +988,8 @@ def su_history(su_num):
     # Load data from database only
     df_new = load_data_from_database()
     df_new['SU_Num'] = df_new['SU_Num'].astype(str).str.strip() if 'SU_Num' in df_new.columns else df_new['SU #'].astype(str).str.strip()
+    # Ensure troop_id is formatted as 5-character string
+    df_new['troop_id'] = df_new['troop_id'].astype(str).str.strip().apply(lambda x: f"{x:>5}")
     df_new['canonical_cookie_type'] = df_new['cookie_type'].apply(normalize_cookie_type)
     df_su = df_new[df_new['SU_Num'] == str(su_num)]
     if df_su.empty:
@@ -1022,6 +1025,8 @@ def su_scatter_regression(su_num):
     # Load data from database only
     df_new = load_data_from_database()
     df_new['SU_Num'] = df_new['SU_Num'].astype(str).str.strip() if 'SU_Num' in df_new.columns else df_new['SU #'].astype(str).str.strip()
+    # Ensure troop_id is formatted as 5-character string
+    df_new['troop_id'] = df_new['troop_id'].astype(str).str.strip().apply(lambda x: f"{x:>5}")
     df_su = df_new[df_new['SU_Num'] == str(su_num)]
     filtered = df_su.dropna(subset=['number_of_girls', 'number_cases_sold'])
     if filtered.empty or filtered['number_of_girls'].nunique() < 2:
@@ -1052,10 +1057,10 @@ def su_scatter_regression(su_num):
         lower.append({"x": xi, "y": pred - margin})
         upper.append({"x": xi, "y": pred + margin})
     return jsonify({"line": line, "lower": lower, "upper": upper})
-@app.route('/api/regression/<int:troop_id>')
-def regression(troop_id):
+@app.route('/api/regression/<string:troop_id>')
+def regression(troop_id: str):
     # Filter data for the given troop ID
-    troop_df = df[df['troop_id'] == troop_id]
+    troop_df = df[df['troop_id'].astype(str) == troop_id]
     if troop_df.empty:
         return jsonify({"error": "No data found for troop"}), 404
 
@@ -1176,6 +1181,8 @@ def su_predict():
         }, inplace=True)
         df_new['year'] = df_new['year'].astype(int)
         df_new['troop_id'] = df_new['troop_id'].astype(str).str.strip()
+        # Ensure troop_id is formatted as 5-character string
+        df_new['troop_id'] = df_new['troop_id'].apply(lambda x: f"{x:>5}")
         df_new['SU_Num'] = df_new['SU_Num'].astype(str).str.strip() if 'SU_Num' in df_new.columns else df_new['SU #'].astype(str).str.strip()
         df_new['cookie_type'] = df_new['cookie_type'].str.strip().str.lower()
         df_new['normalized_cookie_type'] = df_new['cookie_type'].apply(normalize_cookie_type)
@@ -1386,30 +1393,33 @@ def su_predict():
                     "image_url": url_for('static', filename=cookie_image_map.get(cookie, "default.png"), _external=True),
                     "source": "fallback"
                 })
-        # Compute the prediction interval for each final prediction
+        # Create final predictions without intervals and add last year based predictions
         final_predictions = []
         for pred in all_predictions:
             cookie = pred["cookie_type"]
             predicted_val = float(pred["predicted"])
-            candidate_mse = pred.get("candidate_mse", None)
-            cluster_std = pred.get("cluster_std", None)
-            if candidate_mse is not None and candidate_mse > 0:
-                candidate_std = np.sqrt(candidate_mse)
-                interval_width = 1.96 * candidate_std
-            elif cluster_std is not None and not np.isnan(cluster_std):
-                interval_width = 1.96 * cluster_std
-            else:
-                if preds_for_rmse:
-                    overall_rmse = np.sqrt(mean_squared_error(preds_for_rmse, preds_for_rmse))
-                    interval_width = overall_rmse * 2 if overall_rmse > 0 else 10
-                else:
-                    interval_width = 10
+            
+            # Get last year sales and girls count for this cookie type from SU data
+            last_year_sales = None
+            last_year_girls = None
+            test_cookie_data = test[test['normalized_cookie_type'] == cookie]
+            if not test_cookie_data.empty:
+                last_year_sales = test_cookie_data.iloc[0]['cases_sold']
+                last_year_girls = test_cookie_data.iloc[0]['num_girls']
+            
+            # Calculate last year based prediction
+            last_year_based_prediction = None
+            if last_year_sales is not None and last_year_girls is not None and last_year_girls > 0:
+                # Scale last year's sales based on the ratio of girls
+                girls_ratio = num_girls / last_year_girls
+                last_year_based_prediction = last_year_sales * girls_ratio
+            
             image_url = url_for('static', filename=cookie_image_map.get(cookie, "default.png"), _external=True)
             final_predictions.append({
                 "cookie_type": cookie,
                 "predicted_cases": round(predicted_val, 2),
-                "interval_lower": round(max(1, predicted_val - interval_width), 2),
-                "interval_upper": round(predicted_val + interval_width, 2),
+                "last_year_sales": round(last_year_sales, 2) if last_year_sales is not None else None,
+                "last_year_based_prediction": round(last_year_based_prediction, 2) if last_year_based_prediction is not None else None,
                 "image_url": image_url,
                 "source": "model"
             })
@@ -1433,8 +1443,6 @@ def su_predict():
                 final_predictions.append({
                     "cookie_type": rc,
                     "predicted_cases": round(pred_val, 2),
-                    "interval_lower": round(max(1, pred_val - 10), 2),
-                    "interval_upper": round(pred_val + 10, 2),
                     "image_url": url_for('static', filename=cookie_image_map.get(rc, "default.png"), _external=True),
                     "source": "fallback"
                 })
@@ -1470,8 +1478,6 @@ def su_predict():
                 final_predictions.append({
                     "cookie_type": cookie,
                     "predicted_cases": round(value, 2),
-                    "interval_lower": round(max(1, value - 10), 2),
-                    "interval_upper": round(value + 10, 2),
                     "image_url": url_for('static', filename=cookie_image_map.get(cookie, "default.png"), _external=True),
                     "source": "fallback"
                 })
@@ -1485,8 +1491,8 @@ def su_predict():
                 filtered_predictions.append({
                     "cookie_type": cookie,
                     "predicted_cases": None,
-                    "interval_lower": None,
-                    "interval_upper": None,
+                    "last_year_sales": None,
+                    "last_year_based_prediction": None,
                     "image_url": url_for('static', filename=cookie_image_map.get(cookie, "default.png"), _external=True),
                     "source": "missing"
                 })
