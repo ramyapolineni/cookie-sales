@@ -71,6 +71,19 @@ df['number_of_girls'] = df['number_of_girls'].astype(float)
 df['number_cases_sold'] = df['number_cases_sold'].astype(float)
 df['period_squared'] = df['period'] ** 2
 
+# SU_Num cleaning is now handled exclusively in the ETL pipeline.
+# This check will warn if any legacy data with a non-numeric SU_Num is present.
+if (df['SU_Num'].str.match(r'^SU', case=False).any() or df['SU_Num'].str.contains(r'[^0-9]', regex=True).any()):
+    print("[WARNING] Some SU_Num values in the loaded data are not purely numeric. Please reprocess your data with the updated ETL pipeline.")
+
+# Debug: Check SU_Num values in the loaded data
+print(f"[DEBUG] SU_Num values in loaded data: {df['SU_Num'].unique()[:10]}")
+print(f"[DEBUG] Years in loaded data: {sorted(df['period'].unique())}")
+
+# Clean SU_Num values if they still have SU prefix (temporary fix)
+df['SU_Num'] = df['SU_Num'].astype(str).str.replace(r'^SU\s*', '', regex=True).str.replace(r'^SU', '', regex=True).str.strip()
+print(f"[DEBUG] SU_Num values after cleaning: {df['SU_Num'].unique()[:10]}")
+
 # Normalize cookie types
 normalized_to_canonical = {
     'adventurefuls': 'Adventurefuls',
@@ -960,8 +973,15 @@ def su_search():
     # Filter out SU numbers that contain letters and ensure they are numeric
     df_clean = df.copy()
     df_clean['SU_Num'] = df_clean['SU_Num'].astype(str).str.strip()
+    
+    # Debug: Check what SU_Num values exist in the database
+    print(f"[DEBUG] SU_Num values in database: {df_clean['SU_Num'].unique()[:10]}")
+    
     # Only keep rows where SU_Num contains only digits
     df_clean = df_clean[df_clean['SU_Num'].str.match(r'^\d+$')]
+    
+    # Debug: Check what SU_Num values remain after filtering
+    print(f"[DEBUG] SU_Num values after filtering: {df_clean['SU_Num'].unique()[:10]}")
     
     # If query is empty, return all unique SU numbers
     if not query:

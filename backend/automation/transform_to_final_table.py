@@ -22,8 +22,17 @@ def load_and_clean_participation(file_path: str) -> pd.DataFrame:
     
     # Clean SU_Num by removing "SU" prefix for files from 2025 onwards
     year_from_filename = int(re.search(r'(\d{4})', file_path).group(1))
+    print(f"[DEBUG] Processing file: {file_path}, detected year: {year_from_filename}")
+    print(f"[DEBUG] Original SU_Num samples: {part_df['SU_Num'].head().tolist()}")
     if year_from_filename >= 2025:
-        part_df['SU_Num'] = part_df['SU_Num'].astype(str).str.replace(r'^SU\s*', '', regex=True).str.strip()
+        print(f"[DEBUG] Applying SU prefix removal for year {year_from_filename}")
+        # More comprehensive SU prefix removal - handles various formats including SU610
+        part_df['SU_Num'] = part_df['SU_Num'].astype(str).str.replace(r'^SU\s*', '', regex=True).str.replace(r'^SU', '', regex=True).str.strip()
+        # Additional cleanup for any remaining SU variations
+        part_df['SU_Num'] = part_df['SU_Num'].str.replace(r'^SU\s*', '', regex=True)
+        print(f"[DEBUG] Processing {year_from_filename} - SU_Num samples after cleaning: {part_df['SU_Num'].head().tolist()}")
+    else:
+        print(f"[DEBUG] Skipping SU prefix removal for year {year_from_filename} (before 2025)")
     
     # Clean troop_id and format as 5-character string
     part_df['troop_id'] = part_df['troop_id'].astype(str).str.strip()
@@ -102,8 +111,17 @@ def load_and_clean_sales(file_path: str, year: int) -> pd.DataFrame:
     })
     
     # Clean SU_Num by removing "SU" prefix for files from 2025 onwards
+    print(f"[DEBUG] Processing sales file for year: {year}")
+    print(f"[DEBUG] Original SU_Num samples: {sales_df['SU_Num'].head().tolist()}")
     if year >= 2025:
-        sales_df['SU_Num'] = sales_df['SU_Num'].astype(str).str.replace(r'^SU\s*', '', regex=True).str.strip()
+        print(f"[DEBUG] Applying SU prefix removal for year {year}")
+        # More comprehensive SU prefix removal - handles various formats including SU610
+        sales_df['SU_Num'] = sales_df['SU_Num'].astype(str).str.replace(r'^SU\s*', '', regex=True).str.replace(r'^SU', '', regex=True).str.strip()
+        # Additional cleanup for any remaining SU variations
+        sales_df['SU_Num'] = sales_df['SU_Num'].str.replace(r'^SU\s*', '', regex=True)
+        print(f"[DEBUG] Processing {year} - SU_Num samples after cleaning: {sales_df['SU_Num'].head().tolist()}")
+    else:
+        print(f"[DEBUG] Skipping SU prefix removal for year {year} (before 2025)")
 
     id_cols = ['troop_id', 'SU_Name', 'SU_Num']
     cookie_cols = [col for col in sales_df.columns if col not in id_cols and "Total" not in col]

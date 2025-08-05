@@ -6,3 +6,4 @@ cookie-drive-bot.json
 data/
 *.csv
 cookie-drive-bot.json
+venv/
