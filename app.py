@@ -28,13 +28,13 @@ CORS(app, resources={r"/api/*": {"origins": ["http://localhost:3000", "https://g
 # -------------------------------
 def get_database_connection() -> Any:
     """Create database connection using environment variable"""
-    database_url = os.getenv('DATABASE_URL')
+    database_url = os.getenv('RENDER_DATABASE_URL')
     if database_url:
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
         return create_engine(database_url)
     else:
-        raise Exception("DATABASE_URL not found. Please set it in your environment.")
+        raise Exception("RENDER_DATABASE_URL not found. Please set it in your environment.")
 
 def load_data_from_database() -> pd.DataFrame:
     """Load data from PostgreSQL database"""
