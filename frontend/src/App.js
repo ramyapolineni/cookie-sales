@@ -98,16 +98,26 @@ function CustomDropdown({
   value, 
   onChange, 
   options, 
-  placeholder 
+  placeholder,
+  displayKey = null,
+  valueKey = null
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const dropdownRef = useRef(null);
 
   // Filter options based on search term - show options that contain the search term anywhere
-  const filteredOptions = options.filter(option => 
-    option.toString().includes(searchTerm)
-  );
+  const filteredOptions = options.filter(option => {
+    if (displayKey && valueKey) {
+      // For objects, search in both display and value keys
+      const displayText = option[displayKey]?.toString() || '';
+      const valueText = option[valueKey]?.toString() || '';
+      return displayText.includes(searchTerm) || valueText.includes(searchTerm);
+    } else {
+      // For simple strings/numbers
+      return option.toString().includes(searchTerm);
+    }
+  });
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -123,7 +133,9 @@ function CustomDropdown({
   }, []);
 
   const handleSelect = (option) => {
-    onChange(option);
+    // If we have valueKey, use that value, otherwise use the option itself
+    const selectedValue = valueKey ? option[valueKey] : option;
+    onChange(selectedValue);
     setIsOpen(false);
     setSearchTerm("");
   };
@@ -190,7 +202,10 @@ function CustomDropdown({
                   className="dropdown-option"
                   onMouseDown={() => handleSelect(option)}
                 >
-                  {option}
+                  {displayKey && valueKey ? 
+                    `${option[valueKey]} - ${option[displayKey]}` : 
+                    option
+                  }
                 </div>
               ))
             ) : (
@@ -362,7 +377,7 @@ function CustomDropdown({
   }
   
 /* ------------------------------------------------------------------
-   PAGE 2: NewTroopSearchPage -> user enters SU # and sees suggestions (non-clickable)
+   PAGE 2: NewTroopSearchPage -> user enters Service Unit # and sees suggestions (non-clickable)
    ------------------------------------------------------------------ */
 function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
   const [suInput, setSuInput] = useState("");
@@ -370,17 +385,16 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
   const [error, setError] = useState("");
   const [suOptions, setSuOptions] = useState([]);
 
-  // Fetch all SU options on mount
+  // Fetch all Service Unit options on mount
   useEffect(() => {
     const fetchSUOptions = async () => {
       try {
         const res = await fetch(`${API_BASE}/api/su_search?q=`);
         const data = await res.json();
-        // Convert to array of SU numbers for the dropdown
-        const suNumbers = data.map(item => item.SU_Num.toString());
-        setSuOptions(suNumbers);
+        // Store full data with both SU_Num and SU_Name
+        setSuOptions(data);
       } catch (err) {
-        console.error("Error fetching SU options:", err);
+        console.error("Error fetching Service Unit options:", err);
       }
     };
     fetchSUOptions();
@@ -388,7 +402,7 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
 
   const handleSearch = async () => {
     if (!/^\d+$/.test(suInput)) {
-      setError("Please enter a valid SU number (digits only).");
+      setError("Please enter a valid Service Unit number (digits only).");
       return;
     }
     if (!numGirls || isNaN(numGirls)) {
@@ -397,30 +411,15 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
     }
     const validatedGirls = Math.max(0, Math.min(250, Number(numGirls)));
     setError("");
-    try {
-      const res = await fetch(`${API_BASE}/api/su_search?q=${suInput}`);
-      const data = await res.json();
-      if (!data || data.length === 0) {
-        setError("No SU found with that number.");
-        return;
-      }
-      const exactMatches = data.filter(
-        (item) => parseInt(item["SU_Num"], 10) === parseInt(suInput, 10)
-      );
-      if (exactMatches.length === 0) {
-        setError("No SU found with that number.");
-        return;
-      }
-      const bestMatch = exactMatches.reduce((prev, current) => {
-        return current["SU_Name"].length > prev["SU_Name"].length
-          ? current
-          : prev;
-      });
-      onSearch(bestMatch["SU_Num"], bestMatch["SU_Name"], validatedGirls);
-    } catch (err) {
-      console.error("Error fetching SU info:", err);
-      setError("An error occurred while searching. Please try again.");
+    
+    // Find the selected Service Unit from the options
+    const selectedServiceUnit = suOptions.find(option => option.SU_Num.toString() === suInput);
+    if (!selectedServiceUnit) {
+      setError("No Service Unit found with that number.");
+      return;
     }
+    
+    onSearch(selectedServiceUnit.SU_Num, selectedServiceUnit.SU_Name, validatedGirls);
   };
 
   return (
@@ -439,16 +438,18 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
           <div className="nav-link" onClick={onFaq}><FaQuestionCircle /></div>
         </nav>
       </header>
-      <h1 className="title">New Troop SU Search</h1>
-      <p className="subtitle">Enter your SU number and Number of Girls</p>
+      <h1 className="title">New Troop Service Unit Search</h1>
+      <p className="subtitle">Enter your Service Unit number and Number of Girls</p>
              <div className="input-container">
          <div className="input-box">
-           SU Num:{" "}
+           Service Unit:{" "}
            <CustomDropdown
              value={suInput}
              onChange={setSuInput}
              options={suOptions}
              placeholder="e.g. 153"
+             displayKey="SU_Name"
+             valueKey="SU_Num"
            />
          </div>
         <div className="input-box">
@@ -473,7 +474,7 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
 }
 
 /* ------------------------------------------------------------------
-   PAGE 3: NewTroopAnalyticsPage -> show SU analytics (charts, scatter, etc.)
+   PAGE 3: NewTroopAnalyticsPage -> show Service Unit analytics (charts, scatter, etc.)
    Includes:
      - A new input for the question: "How many girls do you think will sell?"
      - Vertical highlighting (via ReferenceLine) in each scatter chart at that value.
@@ -507,8 +508,8 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
           setSalesData(history.salesByYear || []);
           setScatterData(history.scatterData || []);
         } catch (err) {
-          console.error("Error fetching SU history:", err);
-          setError("Could not fetch SU history.");
+          console.error("Error fetching Service Unit history:", err);
+          setError("Could not fetch Service Unit history.");
         } finally {
           setLoading(false);
         }
@@ -516,7 +517,7 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
       fetchHistory();
     }, [suNumber]);
 
-    // Function to fetch SU predictions using a given number of girls
+    // Function to fetch Service Unit predictions using a given number of girls
     const fetchSUPredictions = async (girlsVal) => {
       setPredictionsLoading(true);
       try {
@@ -531,18 +532,18 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
         const data = await res.json();
         setSuPredictions(data);
       } catch (err) {
-        console.error("Error fetching SU predictions:", err);
+        console.error("Error fetching Service Unit predictions:", err);
       } finally {
         setPredictionsLoading(false);
       }
     };
 
-    // Fetch initial predictions **once** when the SU loads and we have an initial girls value.
+    // Fetch initial predictions **once** when the Service Unit loads and we have an initial girls value.
     const initFetched = React.useRef(false);
     useEffect(() => {
       if (!initFetched.current && suNumber && predictedGirls && !isNaN(predictedGirls)) {
         fetchSUPredictions(predictedGirls);
-        initFetched.current = true; // ensure we only run once for this SU load
+        initFetched.current = true; // ensure we only run once for this Service Unit load
       }
     }, [suNumber, predictedGirls]);
 
@@ -595,8 +596,13 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
       // Convert percentage to multiplier (e.g., 50% = 0.5, 150% = 1.5)
       const multiplier = appliedPercentage / 100;
       return originalCases * multiplier;
+        };
+
+    // Function to calculate 100% predicted cases (for comparison)
+    const get100PercentPredictedCases = (originalCases) => {
+      return originalCases;
     };
-  
+
     return (
       <div className="main-container">
         <div className="background"></div>
@@ -613,9 +619,9 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
             <div className="nav-link" onClick={onFaq}><FaQuestionCircle /></div>
           </nav>
         </header>
-        <h1 className="title">SU Dashboard</h1>
+        <h1 className="title">Service Unit Dashboard</h1>
         <p className="subtitle">
-          Showing analytics for SU #{suNumber}{suName ? ` - ${suName}` : ""}
+          Showing analytics for Service Unit #{suNumber}{suName ? ` - ${suName}` : ""}
         </p>
   
         <div className="input-container" style={{ marginBottom: "20px" }}>
@@ -678,15 +684,21 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
                         {pred.cookie_type}
                       </div>
                       <div className="predicted" style={{ fontSize: "20px" }}>
-                        <strong>Predicted Cases:</strong>{" "}
+                        <strong>ML Predicted Cases (Historical):</strong>{" "}
                         {pred.predicted_cases != null ? getAdjustedPredictedCases(pred.predicted_cases).toFixed(1) : "--"}
+                        <span style={{ fontSize: "16px", color: "#666", marginLeft: "10px" }}>
+                          (100%: {pred.predicted_cases != null ? get100PercentPredictedCases(pred.predicted_cases).toFixed(1) : "--"})
+                        </span>
                       </div>
-                      <div className="interval" style={{ fontSize: "20px" }}>
-                        <strong>Interval:</strong>{" "}
-                        {pred.interval_lower != null && pred.interval_upper != null
-                          ? `[${pred.interval_lower}, ${pred.interval_upper}]`
-                          : "--"}
+                      
+                      <div className="last-year-based" style={{ fontSize: "16px", color: "#666", marginTop: "8px" }}>
+                        <strong>Last Year Sales Based (SIO):</strong>{" "}
+                        {pred.last_year_based_prediction != null ? getAdjustedPredictedCases(pred.last_year_based_prediction).toFixed(1) : "No data"}
+                        <span style={{ fontSize: "14px", color: "#999", marginLeft: "10px" }}>
+                          (100%: {pred.last_year_based_prediction != null ? get100PercentPredictedCases(pred.last_year_based_prediction).toFixed(1) : "No data"})
+                        </span>
                       </div>
+
                       {pred.predicted_cases == null && (
                         <div className="no-data" style={{ fontSize: "14px", color: "#f0ad4e" }}>
                           No historical data available
@@ -822,8 +834,8 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
     }, []);
   
       const handleSearch = () => {
-    if (!/^\d{5}$/.test(troopInput)) {
-      setError("Please enter a valid 5-digit Troop ID.");
+    if (!troopInput || troopInput.trim().length === 0) {
+      setError("Please enter a valid Troop ID.");
       return;
     }
     if (!numGirls || isNaN(numGirls)) {
@@ -832,9 +844,9 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
     }
     const validatedGirls = Math.max(0, Math.min(250, Number(numGirls)));
     setError("");
-    // Convert 5-digit format back to original number for backend
-    const originalTroopId = parseInt(troopInput, 10).toString();
-    onSearch(originalTroopId, validatedGirls);
+    // Format troop ID as 5-character string with leading spaces
+    const troopId = troopInput.trim().padStart(5);
+    onSearch(troopId, validatedGirls);
   };
   
     return (
@@ -854,7 +866,7 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
           </nav>
         </header>
         <h1 className="title">Returning Troops</h1>
-        <p className="subtitle">Enter your Troop ID and Number of Girls</p>
+        <p className="subtitle">Enter your Troop ID (5 characters) and Number of Girls</p>
         <div className="input-container">
           <div className="input-box">
             Troop ID:{" "}
@@ -900,7 +912,7 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
     const [loading, setLoading] = useState(false); // for analytics/history
     const [loadingPredictions, setLoadingPredictions] = useState(false); // for predictions only
     const [error, setError] = useState("");
-    // Associated SU info (returned by /api/history)
+    // Associated Service Unit info (returned by /api/history)
     const [suInfo, setSuInfo] = useState({ su: null, suName: null });
     // State for updating number of girls (prefilled with initial value)
     const [updatedNumGirls, setUpdatedNumGirls] = useState(Math.max(0, Math.min(250, numGirls)));
@@ -909,19 +921,7 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
     const [percentageError, setPercentageError] = useState("");
     const [appliedPercentage, setAppliedPercentage] = useState(50); // State for the percentage applied to predictions
   
-    // Debug: Log data whenever it changes
-    useEffect(() => {
-      console.log("[DEBUG] girlsData:", girlsData);
-    }, [girlsData]);
-    useEffect(() => {
-      console.log("[DEBUG] salesData:", salesData);
-    }, [salesData]);
-    useEffect(() => {
-      console.log("[DEBUG] cookieBreakdownData:", cookieBreakdownData);
-    }, [cookieBreakdownData]);
-    useEffect(() => {
-      console.log("[DEBUG] cookieTypes:", cookieTypes);
-    }, [cookieTypes]);
+
   
     // Fetch history and cookie breakdown data when troopId changes
     useEffect(() => {
@@ -971,7 +971,7 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
     const fetchPredictions = async (girlsVal) => {
       setLoadingPredictions(true); // <-- Show spinner while fetching predictions
       try {
-        console.log("Updating predictions with", Number(girlsVal));
+
         const res = await fetch(`${API_BASE}/api/predict`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -988,7 +988,7 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
           const key = d.cookie_type;
           formatted[key] = {
             predictedCases: d.predicted_cases,
-            interval: [d.interval_lower, d.interval_upper],
+            last_year_based_prediction: d.last_year_based_prediction,
             imageUrl: d.image_url, // backend provides correct URL
           };
         });
@@ -1045,7 +1045,7 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
       }
     };
   
-    // Function to calculate adjusted predicted cases based on percentage
+        // Function to calculate adjusted predicted cases based on percentage
     const getAdjustedPredictedCases = (originalCases) => {
       if (!appliedPercentage || isNaN(appliedPercentage)) {
         return originalCases;
@@ -1059,7 +1059,12 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
       const multiplier = appliedPercentage / 100;
       return originalCases * multiplier;
     };
-  
+
+    // Function to calculate 100% predicted cases (for comparison)
+    const get100PercentPredictedCases = (originalCases) => {
+      return originalCases;
+    };
+
     return (
       <div className="main-container">
         <div className="background"></div>
@@ -1080,7 +1085,7 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
         <p className="subtitle">
           Troop ID: {troopId}
           {suInfo.su && (
-            <> (SU #{suInfo.su} – {suInfo.suName})</>
+            <> (Service Unit #{suInfo.su} – {suInfo.suName})</>
           )}
         </p>
   
@@ -1138,19 +1143,25 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
                       {cookieName}
                     </div>
                     <div className="predicted" style={{ fontSize: "20px" }}>
-                      <strong>Predicted Cases:</strong>{" "}
+                      <strong>ML Predicted Cases (Historical):</strong>{" "}
                       <span>
                         {pred.predictedCases != null ? getAdjustedPredictedCases(pred.predictedCases).toFixed(1) : "--"}
                       </span>
-                    </div>
-                    <div className="interval" style={{ fontSize: "20px" }}>
-                      <strong>Interval:</strong>{" "}
-                      <span>
-                        {pred && Array.isArray(pred.interval) && typeof pred.interval[0] === "number"
-                          ? `[${pred.interval[0].toFixed(1)}, ${pred.interval[1].toFixed(1)}]`
-                          : "--"}
+                      <span style={{ fontSize: "16px", color: "#666", marginLeft: "10px" }}>
+                        (100%: {pred.predictedCases != null ? get100PercentPredictedCases(pred.predictedCases).toFixed(1) : "--"})
                       </span>
                     </div>
+                    
+                    <div className="last-year-based" style={{ fontSize: "16px", color: "#666", marginTop: "8px" }}>
+                      <strong>Last Year Sales Based (SIO):</strong>{" "}
+                      <span>
+                        {pred.last_year_based_prediction != null ? getAdjustedPredictedCases(pred.last_year_based_prediction).toFixed(1) : "No data"}
+                      </span>
+                      <span style={{ fontSize: "14px", color: "#999", marginLeft: "10px" }}>
+                        (100%: {pred.last_year_based_prediction != null ? get100PercentPredictedCases(pred.last_year_based_prediction).toFixed(1) : "No data"})
+                      </span>
+                    </div>
+
                     {pred.predictedCases == null && (
                       <div className="no-data" style={{ fontSize: "14px", color: "#f0ad4e" }}>
                         No historical data available
@@ -1166,7 +1177,7 @@ function NewTroopSearchPage({ onSearch, onBack, onAbout, onFaq, onHome }) {
         {/* Analytics Section */}
         <div className="analytics-title">ANALYTICS</div>
         <div className="analysis-section">
-          {/* Debug: Show if any data is empty */}
+          
           {girlsData.length === 0 && <div style={{color: 'red'}}>No girlsData</div>}
           {salesData.length === 0 && <div style={{color: 'red'}}>No salesData</div>}
           {cookieBreakdownData.length === 0 && <div style={{color: 'red'}}>No cookieBreakdownData</div>}
@@ -1298,7 +1309,7 @@ function AboutPage({ onBack, onHome, onFaq }) {
                 <ul style={{ margin: '10px 0', paddingLeft: '20px', lineHeight: '1.6', fontSize: '16px', textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)' }}>
                   <li>1.35 cases improvement per troop per cookie type</li>
                   <li>181,000+ additional boxes sold across 1,400+ troops</li>
-                  <li>Real-time predictions with confidence intervals</li>
+                  <li>Real-time predictions with accurate forecasting</li>
                 </ul>
               </div>
               <div style={{ marginBottom: '20px' }}>
@@ -1469,7 +1480,7 @@ function FAQPage({ onBack, onHome, onAbout }) {
     },
     {
       question: "How accurate are the predictions?",
-      answer: "The model improves accuracy by 1.35 cases per troop per cookie type compared to traditional methods. Confidence intervals show the likely range of outcomes for better planning."
+      answer: "The model improves accuracy by 1.35 cases per troop per cookie type compared to traditional methods. Advanced machine learning algorithms provide accurate predictions for better planning."
     },
     {
       question: "Can I adjust predictions for different scenarios?",

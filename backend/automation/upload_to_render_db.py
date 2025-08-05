@@ -1,8 +1,9 @@
 from sqlalchemy import create_engine
 import pandas as pd
 import os
+from typing import Any
 
-def upload_to_render_db(df, table_name="final_cookie_sales_all_years"):
+def upload_to_render_db(df: pd.DataFrame, table_name: str = "final_cookie_sales_all_years") -> None:
     db_url = os.getenv("DATABASE_URL")
     if not db_url:
         raise ValueError("DATABASE_URL not set in environment variables")
